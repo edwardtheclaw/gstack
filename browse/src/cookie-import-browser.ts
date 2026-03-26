@@ -98,12 +98,29 @@ const BROWSER_REGISTRY: BrowserInfo[] = [
 
 const keyCache = new Map<string, Buffer>();
 
+// ─── Platform Guard ─────────────────────────────────────────────
+
+/**
+ * Throw a clear CookieImportError on non-macOS platforms.
+ * Cookie import uses macOS Keychain and ~/Library paths (R10, MD2).
+ */
+function requireMacOS(): void {
+  if (process.platform !== 'darwin') {
+    throw new CookieImportError(
+      `Cookie import from your browser is only supported on macOS. ` +
+      `On ${process.platform}, use 'browse cookie-import <json-file>' to load cookies from a JSON file instead.`,
+      'platform_unsupported',
+    );
+  }
+}
+
 // ─── Public API ─────────────────────────────────────────────────
 
 /**
  * Find which browsers are installed (have a cookie DB on disk).
  */
 export function findInstalledBrowsers(): BrowserInfo[] {
+  requireMacOS();
   const appSupport = path.join(os.homedir(), 'Library', 'Application Support');
   return BROWSER_REGISTRY.filter(b => {
     const dbPath = path.join(appSupport, b.dataDir, 'Default', 'Cookies');
@@ -115,6 +132,7 @@ export function findInstalledBrowsers(): BrowserInfo[] {
  * List unique cookie domains + counts from a browser's DB. No decryption.
  */
 export function listDomains(browserName: string, profile = 'Default'): { domains: DomainEntry[]; browser: string } {
+  requireMacOS();
   const browser = resolveBrowser(browserName);
   const dbPath = getCookieDbPath(browser, profile);
   const db = openDb(dbPath, browser.name);
@@ -141,6 +159,7 @@ export async function importCookies(
   domains: string[],
   profile = 'Default',
 ): Promise<ImportResult> {
+  requireMacOS();
   if (domains.length === 0) return { cookies: [], count: 0, failed: 0, domainCounts: {} };
 
   const browser = resolveBrowser(browserName);

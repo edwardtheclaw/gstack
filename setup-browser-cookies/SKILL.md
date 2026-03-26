@@ -5,12 +5,15 @@ description: |
   Import cookies from your real browser (Comet, Chrome, Arc, Brave, Edge) into the
   headless browse session. Opens an interactive picker UI where you select which
   cookie domains to import. Use before QA testing authenticated pages.
+  macOS only — uses macOS Keychain for decryption.
 allowed-tools:
   - Bash
   - Read
 ---
 
 # Setup Browser Cookies
+
+> **macOS only.** Browser cookie decryption uses the macOS Keychain and `~/Library/Application Support` paths. On Linux or Windows, use `browse cookie-import <json-file>` to load cookies exported as JSON instead.
 
 Import logged-in sessions from your real Chromium browser into the headless browse session.
 
