@@ -24,7 +24,23 @@ const BROWSE_PORT = process.env.CONDUCTOR_PORT
   ? parseInt(process.env.CONDUCTOR_PORT, 10) - PORT_OFFSET
   : parseInt(process.env.BROWSE_PORT || '0', 10); // 0 = auto-scan
 const INSTANCE_SUFFIX = BROWSE_PORT ? `-${BROWSE_PORT}` : '';
-const STATE_FILE = process.env.BROWSE_STATE_FILE || `/tmp/browse-server${INSTANCE_SUFFIX}.json`;
+
+/**
+ * Resolve the state file directory in order of preference:
+ *   1. $XDG_RUNTIME_DIR  (Linux: /run/user/1000, mode 0700, owned by user)
+ *   2. $TMPDIR           (macOS: /var/folders/…/T, user-specific)
+ *   3. /tmp              (legacy fallback)
+ *
+ * Using a user-owned directory prevents other local users from reading
+ * the auth token via /tmp on shared-tmpfs configurations (R2).
+ */
+function resolveStateDir(): string {
+  if (process.env.XDG_RUNTIME_DIR) return process.env.XDG_RUNTIME_DIR;
+  if (process.env.TMPDIR) return process.env.TMPDIR;
+  return '/tmp';
+}
+
+const STATE_FILE = process.env.BROWSE_STATE_FILE || `${resolveStateDir()}/browse-server${INSTANCE_SUFFIX}.json`;
 const IDLE_TIMEOUT_MS = parseInt(process.env.BROWSE_IDLE_TIMEOUT || '1800000', 10); // 30 min
 
 function validateAuth(req: Request): boolean {
@@ -36,9 +52,10 @@ function validateAuth(req: Request): boolean {
 import { consoleBuffer, networkBuffer, dialogBuffer, addConsoleEntry, addNetworkEntry, addDialogEntry, type LogEntry, type NetworkEntry, type DialogEntry } from './buffers';
 export { consoleBuffer, networkBuffer, dialogBuffer, addConsoleEntry, addNetworkEntry, addDialogEntry, type LogEntry, type NetworkEntry, type DialogEntry };
 
-const CONSOLE_LOG_PATH = `/tmp/browse-console${INSTANCE_SUFFIX}.log`;
-const NETWORK_LOG_PATH = `/tmp/browse-network${INSTANCE_SUFFIX}.log`;
-const DIALOG_LOG_PATH = `/tmp/browse-dialog${INSTANCE_SUFFIX}.log`;
+const STATE_DIR = resolveStateDir();
+const CONSOLE_LOG_PATH = `${STATE_DIR}/browse-console${INSTANCE_SUFFIX}.log`;
+const NETWORK_LOG_PATH = `${STATE_DIR}/browse-network${INSTANCE_SUFFIX}.log`;
+const DIALOG_LOG_PATH = `${STATE_DIR}/browse-dialog${INSTANCE_SUFFIX}.log`;
 let lastConsoleFlushed = 0;
 let lastNetworkFlushed = 0;
 let lastDialogFlushed = 0;

@@ -515,7 +515,16 @@ Run `cd ~/.claude/skills/gstack && bun install && bun run build`. This compiles 
 Re-copy from global: `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack && cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup`
 
 **Auth errors ("Unauthorized") or connection refused after an unexpected shutdown?**
-The state file may be stale or corrupt. Delete it and let the next command start a fresh server: `rm /tmp/browse-server.json` (or `rm /tmp/browse-server-<port>.json` if using Conductor).
+The state file may be stale or corrupt. Delete it and let the next command start a fresh server:
+```bash
+# Linux ($XDG_RUNTIME_DIR, typically /run/user/$(id -u)):
+rm "$XDG_RUNTIME_DIR/browse-server.json"
+# macOS ($TMPDIR, typically /var/folders/…/T/):
+rm "$TMPDIR/browse-server.json"
+# Fallback (if neither env var is set):
+rm /tmp/browse-server.json
+# With Conductor (append -<port> to filename, e.g. browse-server-9440.json)
+```
 
 **`bun` not installed?**
 Install it: `curl -fsSL https://bun.sh/install | bash`
@@ -537,6 +546,8 @@ Paste this into Claude Code:
 ## Development
 
 See [BROWSER.md](BROWSER.md) for the full development guide, architecture, and command reference.
+
+A pre-commit hook scans for accidental secrets before every commit. Do not bypass it with `git commit --no-verify` — if a hook fails, fix the underlying issue rather than skipping the check.
 
 ## License
 

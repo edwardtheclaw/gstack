@@ -17,8 +17,64 @@ const BROWSE_PORT = process.env.CONDUCTOR_PORT
   ? parseInt(process.env.CONDUCTOR_PORT, 10) - PORT_OFFSET
   : parseInt(process.env.BROWSE_PORT || '0', 10);
 const INSTANCE_SUFFIX = BROWSE_PORT ? `-${BROWSE_PORT}` : '';
-const STATE_FILE = process.env.BROWSE_STATE_FILE || `/tmp/browse-server${INSTANCE_SUFFIX}.json`;
+
+/**
+ * Resolve the state file directory in order of preference:
+ *   1. $XDG_RUNTIME_DIR  (Linux: /run/user/1000, mode 0700, owned by user)
+ *   2. $TMPDIR           (macOS: /var/folders/…/T, user-specific)
+ *   3. /tmp              (legacy fallback)
+ *
+ * Using a user-owned directory prevents other local users from reading
+ * the auth token via /tmp on shared-tmpfs configurations (R2).
+ */
+function resolveStateDir(): string {
+  if (process.env.XDG_RUNTIME_DIR) return process.env.XDG_RUNTIME_DIR;
+  if (process.env.TMPDIR) return process.env.TMPDIR;
+  return '/tmp';
+}
+
+const STATE_FILE = process.env.BROWSE_STATE_FILE || `${resolveStateDir()}/browse-server${INSTANCE_SUFFIX}.json`;
 const MAX_START_WAIT = 8000; // 8 seconds to start
+
+// ─── Crash-loop Detection ──────────────────────────────────────
+// Tracks recent restart timestamps in a temp file to detect fast crash loops.
+// If the server has crashed N times within a short window, we add backoff and
+// eventually give up rather than hammering a broken binary (R1).
+
+const CRASH_LOG_FILE = process.env.BROWSE_CRASH_LOG || `${resolveStateDir()}/browse-crashes${INSTANCE_SUFFIX}.json`;
+const CRASH_WINDOW_MS = 60_000; // 60-second window
+const CRASH_MAX_IN_WINDOW = 3;  // Give up after 3 crashes within the window
+
+interface CrashLog {
+  timestamps: number[];
+}
+
+function readCrashLog(): CrashLog {
+  try {
+    return JSON.parse(fs.readFileSync(CRASH_LOG_FILE, 'utf-8'));
+  } catch {
+    return { timestamps: [] };
+  }
+}
+
+function recordCrash(): { count: number; backoffMs: number } {
+  const now = Date.now();
+  const log = readCrashLog();
+  // Prune entries outside the window
+  log.timestamps = log.timestamps.filter(t => now - t < CRASH_WINDOW_MS);
+  log.timestamps.push(now);
+  try {
+    fs.writeFileSync(CRASH_LOG_FILE, JSON.stringify(log), { mode: 0o600 });
+  } catch {}
+  const count = log.timestamps.length;
+  // Exponential backoff: 1s, 2s, 4s…
+  const backoffMs = Math.min(1000 * Math.pow(2, count - 1), 8000);
+  return { count, backoffMs };
+}
+
+function clearCrashLog(): void {
+  try { fs.unlinkSync(CRASH_LOG_FILE); } catch {}
+}
 
 export function resolveServerScript(
   env: Record<string, string | undefined> = process.env,
@@ -189,9 +245,18 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
     }
     // Connection error — server may have crashed
     if (err.code === 'ECONNREFUSED' || err.code === 'ECONNRESET' || err.message?.includes('fetch failed')) {
-      if (retries >= 1) throw new Error('[browse] Server crashed twice in a row — aborting');
-      console.error('[browse] Server connection lost. Restarting...');
+      const { count, backoffMs } = recordCrash();
+      if (count > CRASH_MAX_IN_WINDOW) {
+        throw new Error(
+          `[browse] Server has crashed ${count} times in the last ${CRASH_WINDOW_MS / 1000}s — aborting. ` +
+          `Check for GPU/memory issues or run 'browse status' once the server is stable.`
+        );
+      }
+      console.error(`[browse] Server connection lost (crash #${count}). Waiting ${backoffMs}ms before restart...`);
+      await Bun.sleep(backoffMs);
       const newState = await startServer();
+      // On success, clear the crash log so future crashes start fresh
+      clearCrashLog();
       return sendCommand(newState, command, args, retries + 1);
     }
     throw err;
