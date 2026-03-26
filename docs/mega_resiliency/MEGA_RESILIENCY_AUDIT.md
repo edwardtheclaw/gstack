@@ -365,15 +365,15 @@ If a user clones gstack to two locations and runs both, they compete for ports 9
 | 5 | Add `bun.lock` to version control (TD5, QW7) | `.gitignore` | Low | ✅ Done |
 | 6 | Add health check at end of setup script (OP1, QW8) | `setup` | Low | ✅ Done |
 
-### Wave 2 — Security Hardening (3–5 days)
+### Wave 2 — Security Hardening ✅ COMPLETED 2026-03-26
 
-| # | Item | File(s) | Risk |
-|---|------|---------|------|
-| 1 | Move state file to `$XDG_RUNTIME_DIR` (R2, HR1) | `cli.ts`, `server.ts` | Medium (migration) |
-| 2 | Add error message sanitization (S2) | `cookie-picker-routes.ts` | Low |
-| 3 | Add crash-loop detection with backoff (R1) | `cli.ts` | Medium |
-| 4 | Add macOS-only platform check to cookie skill (R10, MD2) | `setup-browser-cookies/SKILL.md`, `cookie-import-browser.ts` | Low |
-| 5 | Add `--no-verify` warning to README (S3, QW5) | `README.md` | None |
+| # | Item | File(s) | Risk | Status |
+|---|------|---------|------|--------|
+| 1 | Move state file to `$XDG_RUNTIME_DIR` (R2, HR1) | `cli.ts`, `server.ts` | Medium (migration) | ✅ Done |
+| 2 | Add error message sanitization (S2) | `cookie-picker-routes.ts` | Low | ✅ Done |
+| 3 | Add crash-loop detection with backoff (R1) | `cli.ts` | Medium | ✅ Done |
+| 4 | Add macOS-only platform check to cookie skill (R10, MD2) | `setup-browser-cookies/SKILL.md`, `cookie-import-browser.ts` | Low | ✅ Done |
+| 5 | Add `--no-verify` warning to README (S3, QW5) | `README.md` | None | ✅ Done |
 
 ### Wave 3 — Observability & Reliability (1 week)
 
