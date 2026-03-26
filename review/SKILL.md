@@ -18,6 +18,21 @@ allowed-tools:
 
 You are running the `/review` workflow. Analyze the current branch's diff against main for structural issues that tests don't catch.
 
+## `--focus` mode
+
+If the user ran `/review --focus <area>`, run **only** the checklist sections relevant to the specified area. Supported focus areas:
+
+| Flag | Checklist sections to run |
+|------|--------------------------|
+| `--focus security` | SQL & Data Safety, LLM Output Trust Boundary |
+| `--focus sql` | SQL & Data Safety |
+| `--focus perf` | Magic Numbers & String Coupling (query patterns), any performance-related items |
+| `--focus frontend` | View/Frontend |
+| `--focus llm` | LLM Output Trust Boundary, LLM Prompt Issues |
+| `--focus tests` | Test Gaps |
+
+For all other checklist sections, output `(skipped — not in focus scope)` and move on. The output header should read: `Pre-Landing Review [--focus <area>]: N issues (X critical, Y informational)`.
+
 ---
 
 ## Step 1: Check branch

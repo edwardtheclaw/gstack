@@ -26,20 +26,32 @@ When the user types `/retro`, run this skill.
 - `/retro 30d` — last 30 days
 - `/retro compare` — compare current window vs prior same-length window
 - `/retro compare 14d` — compare with explicit window
+- `/retro --person <name>` — individual developer deep-dive (see below)
+- `/retro --person <name> 14d` — individual deep-dive with explicit window
 
-## Instructions
+## `--person` mode
 
-Parse the argument to determine the time window. Default to 7 days if no argument given. Use `--since="N days ago"`, `--since="N hours ago"`, or `--since="N weeks ago"` (for `w` units) for git log queries. All times should be reported in **Pacific time** (use `TZ=America/Los_Angeles` when converting timestamps).
+When `--person <name>` is provided, run a focused deep-dive on a **single contributor** instead of the full team retro:
 
-**Argument validation:** If the argument doesn't match a number followed by `d`, `h`, or `w`, the word `compare`, or `compare` followed by a number and `d`/`h`/`w`, show this usage and stop:
+1. Run the same Step 1 git queries, but filter all output to commits by `<name>` (match against author name and email — use `--author="<name>"` in git commands).
+2. Output **only** the personal sections: Summary Table (for this person), Commit Time Distribution, Work Session Detection, Commit Type Breakdown, Hotspot Analysis, and the "Your Week" deep-dive section from Step 9.
+3. **Skip** team-wide sections: leaderboard, team breakdown, team wins, PR size distribution, week-over-week team trends, team habits.
+4. Expand the personal analysis: include full session-by-session breakdown, list every PR/commit with its LOC count, and show their collaboration graph (who reviewed their PRs — extract from `git log --format="%s %b"` for `Reviewed-by:` or `Co-Authored-By:` trailers).
+5. Use the same window argument parsing as normal mode. Default to 7 days if no window given.
+6. **Output header:** `Individual Retro: <name> — last <window>`
+7. **Do NOT save** a `.context/retros/` snapshot for `--person` runs (to avoid polluting the team retro history).
+
+**Argument validation:** If the argument doesn't match a number followed by `d`, `h`, or `w`, the word `compare`, `compare` followed by a number and `d`/`h`/`w`, or `--person <name>` optionally followed by a window, show this usage and stop:
 ```
-Usage: /retro [window]
-  /retro              — last 7 days (default)
-  /retro 24h          — last 24 hours
-  /retro 14d          — last 14 days
-  /retro 30d          — last 30 days
-  /retro compare      — compare this period vs prior period
-  /retro compare 14d  — compare with explicit window
+Usage: /retro [window] [--person <name>]
+  /retro                       — last 7 days (default)
+  /retro 24h                   — last 24 hours
+  /retro 14d                   — last 14 days
+  /retro 30d                   — last 30 days
+  /retro compare               — compare this period vs prior period
+  /retro compare 14d           — compare with explicit window
+  /retro --person alice        — individual deep-dive, last 7 days
+  /retro --person alice 14d    — individual deep-dive, last 14 days
 ```
 
 ### Step 1: Gather Raw Data

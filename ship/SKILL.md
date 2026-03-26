@@ -17,6 +17,25 @@ allowed-tools:
 
 You are running the `/ship` workflow. This is a **non-interactive, fully automated** workflow. Do NOT ask for confirmation at any step. The user said `/ship` which means DO IT. Run straight through and output the PR URL at the end.
 
+## `--dry-run` mode
+
+If the user ran `/ship --dry-run`, execute Steps 1–6 normally (pre-flight, merge, tests, evals, review, version bump, CHANGELOG). **After Step 5 (CHANGELOG), stop** — do NOT commit, push, or create a PR. Instead, output:
+
+```
+DRY RUN COMPLETE — nothing was committed or pushed.
+
+  Branch:     <branch-name>
+  Merge:      <up to date / merged N commits from origin/main>
+  Tests:      <pass/fail summary>
+  Review:     <N issues (X critical, Y informational) / No issues found>
+  Version:    <current> → <proposed>
+  CHANGELOG:  <first 5 bullet points of the generated entry, then "…">
+
+Run /ship to execute for real.
+```
+
+This lets developers verify ship-readiness without committing to a push.
+
 **Only stop for:**
 - On `main` branch (abort)
 - Merge conflicts that can't be auto-resolved (stop, show conflicts)
