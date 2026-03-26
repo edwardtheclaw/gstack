@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# gstack doctor — read-only environment health check
+# Reports status of every gstack dependency without modifying anything.
+
+set -euo pipefail
+
+GSTACK_DIR="$(cd "$(dirname "$0")" && pwd)"
+BROWSE_BIN="$GSTACK_DIR/browse/dist/browse"
+SKILLS_DIR="$(dirname "$GSTACK_DIR")"
+
+OK="  [OK]  "
+WARN="  [WARN]"
+FAIL="  [FAIL]"
+
+pass=0
+warn=0
+fail=0
+
+check() {
+  local status="$1"
+  local label="$2"
+  local detail="$3"
+  case "$status" in
+    ok)   echo "${OK} ${label}${detail:+  — $detail}"; pass=$((pass+1)) ;;
+    warn) echo "${WARN} ${label}${detail:+  — $detail}"; warn=$((warn+1)) ;;
+    fail) echo "${FAIL} ${label}${detail:+  — $detail}"; fail=$((fail+1)) ;;
+  esac
+}
+
+echo ""
+echo "gstack doctor"
+echo "============="
+echo ""
+
+# Resolve bun from PATH or common install locations
+BUN_CMD=""
+if command -v bun >/dev/null 2>&1; then
+  BUN_CMD="bun"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+  BUN_CMD="$HOME/.bun/bin/bun"
+elif [ -x "/root/.bun/bin/bun" ]; then
+  BUN_CMD="/root/.bun/bin/bun"
+elif [ -x "/usr/local/bin/bun" ]; then
+  BUN_CMD="/usr/local/bin/bun"
+fi
+
+# 1. bun
+if [ -n "$BUN_CMD" ]; then
+  bun_version="$($BUN_CMD --version 2>/dev/null || echo unknown)"
+  check ok "bun" "v${bun_version}"
+else
+  check fail "bun" "not found — install from https://bun.sh"
+fi
+
+# 2. browse binary exists and is executable
+if [ -x "$BROWSE_BIN" ]; then
+  check ok "browse binary" "$BROWSE_BIN"
+else
+  check fail "browse binary" "not found at $BROWSE_BIN — run: cd $GSTACK_DIR && bun run build"
+fi
+
+# 3. browse binary is current (no source files newer than binary)
+if [ -x "$BROWSE_BIN" ]; then
+  stale=""
+  if [ -n "$(find "$GSTACK_DIR/browse/src" -type f -newer "$BROWSE_BIN" -print -quit 2>/dev/null)" ]; then
+    stale="source files changed since last build"
+  elif [ "$GSTACK_DIR/package.json" -nt "$BROWSE_BIN" ]; then
+    stale="package.json newer than binary"
+  elif [ -f "$GSTACK_DIR/bun.lock" ] && [ "$GSTACK_DIR/bun.lock" -nt "$BROWSE_BIN" ]; then
+    stale="bun.lock newer than binary"
+  fi
+  if [ -n "$stale" ]; then
+    check warn "browse binary freshness" "$stale — run: cd $GSTACK_DIR && bun run build"
+  else
+    check ok "browse binary freshness" "up to date"
+  fi
+fi
+
+# 4. Playwright Chromium
+if [ -n "$BUN_CMD" ] && (
+  cd "$GSTACK_DIR"
+  "$BUN_CMD" --eval 'import { chromium } from "playwright"; const b = await chromium.launch(); await b.close();' \
+    >/dev/null 2>&1
+); then
+  check ok "Playwright Chromium" "launchable"
+else
+  check fail "Playwright Chromium" "cannot launch — run: cd $GSTACK_DIR && bunx playwright install chromium"
+fi
+
+# 5. browse server health
+if [ -x "$BROWSE_BIN" ]; then
+  if "$BROWSE_BIN" health >/dev/null 2>&1; then
+    check ok "browse server" "healthy"
+  else
+    check warn "browse server" "not responding — starts automatically on first use"
+  fi
+fi
+
+# 6. gh CLI
+if command -v gh >/dev/null 2>&1; then
+  if gh auth status >/dev/null 2>&1; then
+    gh_user="$(gh api user --jq .login 2>/dev/null || echo unknown)"
+    check ok "gh CLI" "authenticated as ${gh_user}"
+  else
+    check warn "gh CLI" "not authenticated — run: gh auth login"
+  fi
+else
+  check warn "gh CLI" "not installed — needed for /ship PR creation"
+fi
+
+# 7. Skill symlinks (only relevant inside .claude/skills/)
+SKILLS_BASENAME="$(basename "$SKILLS_DIR")"
+if [ "$SKILLS_BASENAME" = "skills" ]; then
+  missing_links=()
+  for skill_dir in "$GSTACK_DIR"/*/; do
+    if [ -f "$skill_dir/SKILL.md" ]; then
+      skill_name="$(basename "$skill_dir")"
+      [ "$skill_name" = "node_modules" ] && continue
+      target="$SKILLS_DIR/$skill_name"
+      if [ ! -L "$target" ] && [ ! -e "$target" ]; then
+        missing_links+=("$skill_name")
+      fi
+    fi
+  done
+  if [ ${#missing_links[@]} -eq 0 ]; then
+    check ok "skill symlinks" "all linked"
+  else
+    check warn "skill symlinks" "missing: ${missing_links[*]} — run: $GSTACK_DIR/setup"
+  fi
+else
+  check ok "skill symlinks" "(skipped — not inside .claude/skills/)"
+fi
+
+# 8. git repo
+if git -C "$GSTACK_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  git_branch="$(git -C "$GSTACK_DIR" branch --show-current 2>/dev/null || echo unknown)"
+  check ok "git repo" "branch: $git_branch"
+else
+  check warn "git repo" "not a git repository"
+fi
+
+# Summary
+echo ""
+echo "─────────────────────────────────"
+total=$((pass + warn + fail))
+echo "  ${pass}/${total} checks passed  |  ${warn} warnings  |  ${fail} failures"
+echo ""
+
+if [ "$fail" -gt 0 ]; then
+  exit 1
+elif [ "$warn" -gt 0 ]; then
+  exit 0
+else
+  echo "  All systems go."
+  echo ""
+  exit 0
+fi
