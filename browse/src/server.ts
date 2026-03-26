@@ -41,7 +41,15 @@ function resolveStateDir(): string {
 }
 
 const STATE_FILE = process.env.BROWSE_STATE_FILE || `${resolveStateDir()}/browse-server${INSTANCE_SUFFIX}.json`;
+const CRASH_LOG_PATH = `${STATE_DIR}/browse-crashes${INSTANCE_SUFFIX}.log`;
 const IDLE_TIMEOUT_MS = parseInt(process.env.BROWSE_IDLE_TIMEOUT || '1800000', 10); // 30 min
+
+// ─── Structured Logging (O1) ────────────────────────────────
+function serverLog(level: 'INFO' | 'WARN' | 'ERROR', message: string) {
+  const ts = new Date().toISOString();
+  const out = level === 'ERROR' ? console.error : console.log;
+  out(`[${ts}] [browse:${level}] ${message}`);
+}
 
 function validateAuth(req: Request): boolean {
   const header = req.headers.get('authorization');
@@ -117,7 +125,7 @@ function resetIdleTimer() {
 
 const idleCheckInterval = setInterval(() => {
   if (Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
-    console.log(`[browse] Idle for ${IDLE_TIMEOUT_MS / 1000}s, shutting down`);
+    serverLog('INFO', `Idle for ${IDLE_TIMEOUT_MS / 1000}s, shutting down`);
     shutdown();
   }
 }, 60_000);
@@ -244,7 +252,7 @@ async function shutdown() {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log('[browse] Shutting down...');
+  serverLog('INFO', 'Shutting down...');
   clearInterval(flushInterval);
   clearInterval(idleCheckInterval);
   await flushBuffers(); // Final flush (async now)
@@ -278,16 +286,16 @@ async function start() {
     port,
     hostname: '127.0.0.1',
     fetch: async (req) => {
-      resetIdleTimer();
-
       const url = new URL(req.url);
 
       // Cookie picker routes — no auth required (localhost-only)
+      // Reset idle timer for interactive routes
       if (url.pathname.startsWith('/cookie-picker')) {
+        resetIdleTimer();
         return handleCookiePickerRoute(url, req, browserManager);
       }
 
-      // Health check — no auth required (now async)
+      // Health check — no auth required, does NOT reset idle timer (R12)
       if (url.pathname === '/health') {
         const healthy = await browserManager.isHealthy();
         return new Response(JSON.stringify({
@@ -295,13 +303,20 @@ async function start() {
           uptime: Math.floor((Date.now() - startTime) / 1000),
           tabs: browserManager.getTabCount(),
           currentUrl: browserManager.getCurrentUrl(),
+          buffersDropped: {
+            console: consoleBuffer.totalDropped,
+            network: networkBuffer.totalDropped,
+            dialog: dialogBuffer.totalDropped,
+          },
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
       }
 
-      // All other endpoints require auth
+      // All other endpoints require auth and reset idle timer
+      resetIdleTimer();
+
       if (!validateAuth(req)) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401,
@@ -311,7 +326,14 @@ async function start() {
 
       if (url.pathname === '/command' && req.method === 'POST') {
         const body = await req.json();
-        return handleCommand(body);
+        const t0 = Date.now();
+        const response = await handleCommand(body);
+        const durationMs = Date.now() - t0;
+        serverLog('INFO', `command=${body.command} status=${response.status} duration=${durationMs}ms`);
+        // Add timing header without mutating the original Response
+        const headers = new Headers(response.headers);
+        headers.set('X-Duration-Ms', String(durationMs));
+        return new Response(response.body, { status: response.status, headers });
       }
 
       return new Response('Not found', { status: 404 });
@@ -329,12 +351,15 @@ async function start() {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), { mode: 0o600 });
 
   browserManager.serverPort = port;
-  console.log(`[browse] Server running on http://127.0.0.1:${port} (PID: ${process.pid})`);
-  console.log(`[browse] State file: ${STATE_FILE}`);
-  console.log(`[browse] Idle timeout: ${IDLE_TIMEOUT_MS / 1000}s`);
+  browserManager.crashLogPath = CRASH_LOG_PATH;
+  serverLog('INFO', `Server running on http://127.0.0.1:${port} (PID: ${process.pid})`);
+  serverLog('INFO', `State file: ${STATE_FILE}`);
+  serverLog('INFO', `Crash log: ${CRASH_LOG_PATH}`);
+  serverLog('INFO', `Idle timeout: ${IDLE_TIMEOUT_MS / 1000}s`);
 }
 
 start().catch((err) => {
-  console.error(`[browse] Failed to start: ${err.message}`);
+  const ts = new Date().toISOString();
+  console.error(`[${ts}] [browse:ERROR] Failed to start: ${err.message}`);
   process.exit(1);
 });

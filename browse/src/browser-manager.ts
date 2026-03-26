@@ -17,6 +17,7 @@
 
 import { chromium, type Browser, type BrowserContext, type Page, type Locator } from 'playwright';
 import { addConsoleEntry, addNetworkEntry, addDialogEntry, networkBuffer, type DialogEntry } from './buffers';
+import * as fs from 'fs';
 
 export class BrowserManager {
   private browser: Browser | null = null;
@@ -29,6 +30,9 @@ export class BrowserManager {
 
   /** Server port — set after server starts, used by cookie-import-browser command */
   public serverPort: number = 0;
+
+  /** Path to append crash events (O5); set by server.ts after start */
+  public crashLogPath: string = '';
 
   // ─── Ref Map (snapshot → @e1, @e2, @c1, @c2, ...) ────────
   private refMap: Map<string, Locator> = new Map();
@@ -44,10 +48,18 @@ export class BrowserManager {
   async launch() {
     this.browser = await chromium.launch({ headless: true });
 
-    // Chromium crash → exit with clear message
+    // Chromium crash → log, append to crash log, exit
     this.browser.on('disconnected', () => {
-      console.error('[browse] FATAL: Chromium process crashed or was killed. Server exiting.');
-      console.error('[browse] Console/network logs flushed to /tmp/browse-*.log');
+      const ts = new Date().toISOString();
+      if (this.crashLogPath) {
+        try {
+          fs.appendFileSync(
+            this.crashLogPath,
+            `[${ts}] CRASH pid=${process.pid} Chromium process disconnected\n`
+          );
+        } catch {}
+      }
+      console.error(`[${ts}] [browse:ERROR] FATAL: Chromium process crashed or was killed. Server exiting.`);
       process.exit(1);
     });
 

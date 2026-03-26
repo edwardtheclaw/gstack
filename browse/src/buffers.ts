@@ -69,6 +69,11 @@ export class CircularBuffer<T> {
     return this._totalAdded;
   }
 
+  /** Number of entries overwritten due to buffer overflow */
+  get totalDropped(): number {
+    return Math.max(0, this._totalAdded - this.capacity);
+  }
+
   clear(): void {
     this.head = 0;
     this._size = 0;

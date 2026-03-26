@@ -375,16 +375,16 @@ If a user clones gstack to two locations and runs both, they compete for ports 9
 | 4 | Add macOS-only platform check to cookie skill (R10, MD2) | `setup-browser-cookies/SKILL.md`, `cookie-import-browser.ts` | Low | ✅ Done |
 | 5 | Add `--no-verify` warning to README (S3, QW5) | `README.md` | None | ✅ Done |
 
-### Wave 3 — Observability & Reliability (1 week)
+### Wave 3 — Observability & Reliability ✅ COMPLETED 2026-03-26
 
-| # | Item | File(s) | Risk |
-|---|------|---------|------|
-| 1 | Enhance `/health` endpoint (O4, QW4) | `server.ts` | Low |
-| 2 | Add structured logging (O1) | `server.ts` | Low |
-| 3 | Add request timing to command responses (O2) | `server.ts` | Low |
-| 4 | Fix `stop` command to await flush before exit (B7) | `server.ts`, `meta-commands.ts` | Low |
-| 5 | Fix idle timeout to exclude `/health` requests (R12) | `server.ts` | Low |
-| 6 | Add crash log file (O5) | `browser-manager.ts`, `cli.ts` | Low |
+| # | Item | File(s) | Risk | Status |
+|---|------|---------|------|--------|
+| 1 | Enhance `/health` endpoint (O4, QW4) | `server.ts` | Low | ✅ Done — added `buffersDropped` |
+| 2 | Add structured logging (O1) | `server.ts` | Low | ✅ Done — `serverLog()` with ISO timestamps + levels |
+| 3 | Add request timing to command responses (O2) | `server.ts` | Low | ✅ Done — `X-Duration-Ms` header + server-side log |
+| 4 | Fix `stop` command to await flush before exit (B7) | `server.ts`, `meta-commands.ts` | Low | ✅ Already resolved — `shutdown()` awaits `flushBuffers()` |
+| 5 | Fix idle timeout to exclude `/health` requests (R12) | `server.ts` | Low | ✅ Done — `/health` no longer resets idle timer |
+| 6 | Add crash log file (O5) | `browser-manager.ts`, `server.ts` | Low | ✅ Done — appends to `browse-crashes.log` on disconnect |
 
 ### Wave 4 — Test Coverage (1–2 weeks)
 
