@@ -267,6 +267,16 @@ export async function handleReadCommand(
     }
 
     case 'perf': {
+      // Parse --budget flag: e.g. --budget ttfb=500,load=3000
+      const budgetIdx = args.indexOf('--budget');
+      const budget: Record<string, number> = {};
+      if (budgetIdx !== -1 && args[budgetIdx + 1]) {
+        for (const part of args[budgetIdx + 1].split(',')) {
+          const [key, val] = part.split('=');
+          if (key && val && !isNaN(Number(val))) budget[key.trim()] = Number(val);
+        }
+      }
+
       const timings = await page.evaluate(() => {
         const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
         if (!nav) return 'No navigation timing data available.';
@@ -283,6 +293,25 @@ export async function handleReadCommand(
         };
       });
       if (typeof timings === 'string') return timings;
+
+      if (Object.keys(budget).length > 0) {
+        // Budget mode: return PASS/FAIL per budgeted metric + all raw values
+        const lines: string[] = [];
+        let anyFail = false;
+        for (const [k, v] of Object.entries(timings)) {
+          if (k in budget) {
+            const pass = v <= budget[k];
+            if (!pass) anyFail = true;
+            lines.push(`${k.padEnd(12)} ${v}ms  (budget: ${budget[k]}ms)  ${pass ? 'PASS' : 'FAIL'}`);
+          } else {
+            lines.push(`${k.padEnd(12)} ${v}ms`);
+          }
+        }
+        lines.push('');
+        lines.push(anyFail ? 'Result: FAIL — one or more metrics exceeded budget.' : 'Result: PASS — all metrics within budget.');
+        return lines.join('\n');
+      }
+
       return Object.entries(timings)
         .map(([k, v]) => `${k.padEnd(12)} ${v}ms`)
         .join('\n');
