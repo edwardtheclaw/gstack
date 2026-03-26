@@ -49,6 +49,13 @@ export async function handleCookiePickerRoute(
 ): Promise<Response> {
   const pathname = url.pathname;
 
+  // DNS rebinding protection: reject requests whose Host header isn't localhost/127.0.0.1
+  // (cookie-picker routes have no Bearer auth — this is the primary access guard)
+  const host = req.headers.get('host') || '';
+  if (!host.startsWith('localhost:') && !host.startsWith('127.0.0.1:')) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, {

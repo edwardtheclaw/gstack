@@ -53,7 +53,15 @@ if ! ensure_playwright_browser; then
   exit 1
 fi
 
-# 3. Only create skill symlinks if we're inside a .claude/skills directory
+# 3. Smoke-test the binary (ensures it's executable and can speak to the server)
+echo "  Verifying browse..."
+if "$BROWSE_BIN" health >/dev/null 2>&1; then
+  echo "  browse health: OK"
+else
+  echo "  Warning: 'browse health' failed. Run 'browse health' manually to diagnose." >&2
+fi
+
+# 4. Only create skill symlinks if we're inside a .claude/skills directory
 SKILLS_BASENAME="$(basename "$SKILLS_DIR")"
 if [ "$SKILLS_BASENAME" = "skills" ]; then
   linked=()

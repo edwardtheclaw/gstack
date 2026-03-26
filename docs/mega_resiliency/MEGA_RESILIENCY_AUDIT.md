@@ -354,16 +354,16 @@ If a user clones gstack to two locations and runs both, they compete for ports 9
 
 ## Wave-Based Remediation Plan
 
-### Wave 1 — Critical Bugs & Quick Wins (1–2 days)
+### Wave 1 — Critical Bugs & Quick Wins ✅ COMPLETED 2026-03-26
 
-| # | Item | File(s) | Risk |
-|---|------|---------|------|
-| 1 | Fix ref map clearing on navigation (B1, QW1) | `write-commands.ts`, `browser-manager.ts` | Low |
-| 2 | Add `Host` header check to cookie-picker routes (S1, QW3) | `cookie-picker-routes.ts` | Low |
-| 3 | Document state file reset in README (MD3, QW2) | `README.md` | None |
-| 4 | Document `CONDUCTOR_PORT`, `BROWSE_IDLE_TIMEOUT` (MD4, MD6, QW6) | `BROWSER.md` | None |
-| 5 | Add `bun.lock` to version control (TD5, QW7) | `.gitignore` | Low |
-| 6 | Add health check at end of setup script (OP1, QW8) | `setup` | Low |
+| # | Item | File(s) | Risk | Status |
+|---|------|---------|------|--------|
+| 1 | Fix ref map clearing on navigation (B1, QW1) | `browser-manager.ts` | Low | ✅ Already implemented via `framenavigated` event |
+| 2 | Add `Host` header check to cookie-picker routes (S1, QW3) | `cookie-picker-routes.ts` | Low | ✅ Done |
+| 3 | Document state file reset in README (MD3, QW2) | `README.md` | None | ✅ Done |
+| 4 | Document `CONDUCTOR_PORT`, `BROWSE_IDLE_TIMEOUT` (MD4, MD6, QW6) | `BROWSER.md` | None | ✅ Already documented |
+| 5 | Add `bun.lock` to version control (TD5, QW7) | `.gitignore` | Low | ✅ Done |
+| 6 | Add health check at end of setup script (OP1, QW8) | `setup` | Low | ✅ Done |
 
 ### Wave 2 — Security Hardening (3–5 days)
 

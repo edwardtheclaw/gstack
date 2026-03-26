@@ -514,6 +514,9 @@ Run `cd ~/.claude/skills/gstack && bun install && bun run build`. This compiles 
 **Project copy is stale?**
 Re-copy from global: `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack && cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup`
 
+**Auth errors ("Unauthorized") or connection refused after an unexpected shutdown?**
+The state file may be stale or corrupt. Delete it and let the next command start a fresh server: `rm /tmp/browse-server.json` (or `rm /tmp/browse-server-<port>.json` if using Conductor).
+
 **`bun` not installed?**
 Install it: `curl -fsSL https://bun.sh/install | bash`
 
