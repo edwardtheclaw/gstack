@@ -24,6 +24,17 @@ import { getCookiePickerHTML } from './cookie-picker-ui';
 const importedDomains = new Set<string>();
 const importedCounts = new Map<string, number>();
 
+// ─── Error Sanitization ─────────────────────────────────────────
+// Strip home directory from error messages to avoid leaking file paths (S2).
+
+function sanitizeError(msg: string): string {
+  const home = process.env.HOME;
+  if (home) {
+    return msg.replaceAll(home, '~');
+  }
+  return msg;
+}
+
 // ─── JSON Helpers ───────────────────────────────────────────────
 
 function jsonResponse(data: any, status = 200): Response {
@@ -202,6 +213,6 @@ export async function handleCookiePickerRoute(
       return errorResponse(err.message, err.code, 400, err.action);
     }
     console.error(`[cookie-picker] Error: ${err.message}`);
-    return errorResponse(err.message || 'Internal error', 'internal_error', 500);
+    return errorResponse(sanitizeError(err.message || 'Internal error'), 'internal_error', 500);
   }
 }
