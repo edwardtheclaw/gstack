@@ -269,6 +269,7 @@ Refs are invalidated on navigation — run `snapshot` again after `goto`.
 | `links` | All links as "text -> href" |
 | `forms` | Forms + fields as JSON |
 | `accessibility` | Full ARIA tree |
+| `a11y` | Accessibility audit — structured violation report (missing labels, alt text, heading order, etc.) |
 
 ### Interaction
 | Command | Description |
@@ -284,6 +285,7 @@ Refs are invalidated on navigation — run `snapshot` again after `goto`.
 | `wait --networkidle` | Wait for network to be idle |
 | `wait --load` | Wait for page load event |
 | `upload <sel> <file...>` | Upload file(s) |
+| `form-fill [idx] [--strategy <desc>]` | Auto-fill form fields with contextually appropriate test data |
 | `cookie-import <json>` | Import cookies from JSON file |
 | `cookie-import-browser [browser] [--domain <d>]` | Import cookies from real browser (opens picker UI, or direct import with --domain) |
 | `dialog-accept [text]` | Auto-accept dialogs |
@@ -303,7 +305,7 @@ Refs are invalidated on navigation — run `snapshot` again after `goto`.
 | `dialog [--clear]` | Dialog messages |
 | `cookies` | All cookies |
 | `storage` | localStorage + sessionStorage |
-| `perf` | Page load timings |
+| `perf [--budget key=ms,...]` | Page load timings; with `--budget` returns PASS/FAIL per metric |
 
 ### Visual
 | Command | Description |

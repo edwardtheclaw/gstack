@@ -30,6 +30,7 @@ If the user ran `/review --focus <area>`, run **only** the checklist sections re
 | `--focus frontend` | View/Frontend |
 | `--focus llm` | LLM Output Trust Boundary, LLM Prompt Issues |
 | `--focus tests` | Test Gaps |
+| `--focus migrate` | Database Migrations |
 
 For all other checklist sections, output `(skipped — not in focus scope)` and move on. The output header should read: `Pre-Landing Review [--focus <area>]: N issues (X critical, Y informational)`.
 

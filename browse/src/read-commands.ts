@@ -115,6 +115,143 @@ export async function handleReadCommand(
       return snapshot;
     }
 
+    case 'a11y': {
+      // DOM-based accessibility audit — no CDN required
+      const violations = await page.evaluate(() => {
+        const issues: Array<{ rule: string; impact: string; element: string; description: string }> = [];
+
+        // Helper: get a short selector for an element
+        function shortSel(el: Element): string {
+          const id = el.id ? `#${el.id}` : '';
+          const cls = el.className && typeof el.className === 'string'
+            ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : '';
+          return `${el.tagName.toLowerCase()}${id || cls}`.slice(0, 60);
+        }
+
+        // 1. Images missing alt text
+        document.querySelectorAll('img').forEach(img => {
+          if (!img.hasAttribute('alt')) {
+            issues.push({ rule: 'img-alt', impact: 'critical',
+              element: shortSel(img), description: 'Image missing alt attribute' });
+          } else if (img.alt === '' && !img.hasAttribute('role')) {
+            // empty alt is fine for decorative — only flag if it looks content-bearing
+            const src = img.src || '';
+            if (src && !/logo|icon|avatar|bg|background|decoration/.test(src.toLowerCase())) {
+              // heuristic: flag suspicious empty alts only if large
+              if ((img.naturalWidth || img.width) > 100) {
+                issues.push({ rule: 'img-alt-empty', impact: 'serious',
+                  element: shortSel(img), description: 'Large content image has empty alt — verify it is decorative' });
+              }
+            }
+          }
+        });
+
+        // 2. Form inputs without accessible labels
+        document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select').forEach(el => {
+          const input = el as HTMLInputElement;
+          const hasLabel = input.labels && input.labels.length > 0;
+          const hasAriaLabel = el.hasAttribute('aria-label') && el.getAttribute('aria-label')!.trim() !== '';
+          const hasAriaLabelledBy = el.hasAttribute('aria-labelledby');
+          const hasTitle = el.hasAttribute('title') && el.getAttribute('title')!.trim() !== '';
+          if (!hasLabel && !hasAriaLabel && !hasAriaLabelledBy && !hasTitle) {
+            issues.push({ rule: 'label', impact: 'critical',
+              element: shortSel(el), description: 'Form control has no accessible label (no <label>, aria-label, aria-labelledby, or title)' });
+          }
+        });
+
+        // 3. Buttons without accessible names
+        document.querySelectorAll('button, [role="button"]').forEach(el => {
+          const text = (el.textContent || '').trim();
+          const ariaLabel = el.getAttribute('aria-label') || '';
+          const ariaLabelledBy = el.getAttribute('aria-labelledby') || '';
+          const title = el.getAttribute('title') || '';
+          const hasImg = el.querySelector('img[alt]') !== null;
+          if (!text && !ariaLabel && !ariaLabelledBy && !title && !hasImg) {
+            issues.push({ rule: 'button-name', impact: 'critical',
+              element: shortSel(el), description: 'Button has no accessible name (no text, aria-label, aria-labelledby, or title)' });
+          }
+        });
+
+        // 4. Links with empty or non-descriptive text
+        document.querySelectorAll('a[href]').forEach(el => {
+          const text = (el.textContent || '').trim();
+          const ariaLabel = el.getAttribute('aria-label') || '';
+          const title = el.getAttribute('title') || '';
+          if (!text && !ariaLabel && !title && !el.querySelector('img[alt]')) {
+            issues.push({ rule: 'link-name', impact: 'serious',
+              element: shortSel(el), description: 'Link has no accessible name' });
+          } else if (/^(click here|here|read more|more|link)$/i.test(text) && !ariaLabel) {
+            issues.push({ rule: 'link-name-descriptive', impact: 'moderate',
+              element: shortSel(el), description: `Non-descriptive link text: "${text}"` });
+          }
+        });
+
+        // 5. Missing lang attribute on <html>
+        const html = document.documentElement;
+        if (!html.hasAttribute('lang') || html.getAttribute('lang')!.trim() === '') {
+          issues.push({ rule: 'html-has-lang', impact: 'serious',
+            element: 'html', description: 'Page missing lang attribute on <html> element' });
+        }
+
+        // 6. Missing page title
+        if (!document.title || document.title.trim() === '') {
+          issues.push({ rule: 'document-title', impact: 'serious',
+            element: 'title', description: 'Page has no <title>' });
+        }
+
+        // 7. Skipped heading levels
+        const headings = [...document.querySelectorAll('h1,h2,h3,h4,h5,h6')]
+          .map(h => parseInt(h.tagName[1], 10));
+        for (let i = 1; i < headings.length; i++) {
+          if (headings[i] - headings[i - 1] > 1) {
+            issues.push({ rule: 'heading-order', impact: 'moderate',
+              element: `h${headings[i]}`, description: `Heading level skips from h${headings[i-1]} to h${headings[i]}` });
+            break; // report once
+          }
+        }
+        const h1Count = headings.filter(h => h === 1).length;
+        if (h1Count === 0) {
+          issues.push({ rule: 'page-has-heading-one', impact: 'moderate',
+            element: 'h1', description: 'Page has no <h1> heading' });
+        } else if (h1Count > 1) {
+          issues.push({ rule: 'page-has-heading-one', impact: 'moderate',
+            element: 'h1', description: `Page has ${h1Count} <h1> headings — should have exactly one` });
+        }
+
+        // 8. Interactive elements with very low contrast (heuristic: white-on-white, black-on-black)
+        // Only catch obvious fails without full color computation
+        document.querySelectorAll('button, a[href], input, label').forEach(el => {
+          const style = getComputedStyle(el);
+          const color = style.color;
+          const bg = style.backgroundColor;
+          if (color === bg && color !== 'rgba(0, 0, 0, 0)') {
+            issues.push({ rule: 'color-contrast', impact: 'serious',
+              element: shortSel(el), description: `Foreground and background color are identical: ${color}` });
+          }
+        });
+
+        return issues;
+      });
+
+      if (violations.length === 0) return 'a11y audit: No violations found.';
+
+      const counts = { critical: 0, serious: 0, moderate: 0 };
+      for (const v of violations) {
+        if (v.impact in counts) counts[v.impact as keyof typeof counts]++;
+      }
+      const summary = `a11y audit: ${violations.length} violation${violations.length === 1 ? '' : 's'} ` +
+        `(${counts.critical} critical, ${counts.serious} serious, ${counts.moderate} moderate)`;
+
+      const lines = [summary, ''];
+      for (const v of violations) {
+        lines.push(`[${v.impact.toUpperCase()}] ${v.rule}`);
+        lines.push(`  Element: ${v.element}`);
+        lines.push(`  Issue:   ${v.description}`);
+        lines.push('');
+      }
+      return lines.join('\n').trimEnd();
+    }
+
     case 'js': {
       const expr = args[0];
       if (!expr) throw new Error('Usage: browse js <expression>');

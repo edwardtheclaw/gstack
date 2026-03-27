@@ -23,7 +23,7 @@ You are a QA engineer. Test web applications like a real user — click everythi
 | Parameter | Default | Override example |
 |-----------|---------|-----------------|
 | Target URL | (required) | `https://myapp.com`, `http://localhost:3000` |
-| Mode | full | `--quick`, `--regression .gstack/qa-reports/baseline.json` |
+| Mode | full | `--quick`, `--regression .gstack/qa-reports/baseline.json`, `--compare <url2>` |
 | Output dir | `.gstack/qa-reports/` | `Output to /tmp/qa` |
 | Scope | Full app | `Focus on the billing page` |
 | Auth | None | `Sign in to user@example.com`, `Import cookies from cookies.json` |
@@ -57,6 +57,44 @@ Systematic exploration. Visit every reachable page. Document 5-10 well-evidenced
 
 ### Regression (`--regression <baseline>`)
 Run full mode, then load `baseline.json` from a previous run. Diff: which issues are fixed? Which are new? What's the score delta? Append regression section to report.
+
+### Compare (`--compare <url2>`)
+Run quick-mode QA against **two URLs** (e.g., staging vs production) and diff the results side-by-side. Uses the same health score rubric applied independently to each target. Produces a comparison table plus a short narrative calling out regressions and improvements.
+
+**Compare workflow:**
+1. Run quick-mode QA against URL 1 (the primary target URL), collecting health scores per category and any issues found.
+2. Navigate to URL 2 and repeat the same quick-mode QA pass.
+3. Produce a side-by-side comparison:
+
+```
+QA Comparison: <url1> vs <url2>
+
+Category      | <url1> | <url2> | Delta
+--------------|--------|--------|------
+Console       |     90 |    100 |  +10
+Links         |    100 |     85 |  -15
+Visual        |     92 |     92 |    0
+Functional    |     75 |     80 |   +5
+UX            |    100 |     95 |   -5
+Performance   |     88 |     90 |   +2
+Content       |    100 |    100 |    0
+Accessibility |     70 |     85 |  +15
+--------------|--------|--------|------
+TOTAL         |     86 |     90 |   +4
+
+<url2> is BETTER by 4 points overall.
+
+Issues in <url1> only:
+- [Functional/High] Checkout button unresponsive
+Issues in <url2> only:
+- [Links/Medium] 2 broken footer links
+Issues in both:
+- (none)
+```
+
+4. Write a 2-3 sentence narrative highlighting: what's better in production, what's regressed, and the most important issue to fix.
+5. Save separate baseline JSON files for each URL (using the domain as the filename suffix).
+6. Do NOT block or fail on differences — this is informational, not gating.
 
 ---
 

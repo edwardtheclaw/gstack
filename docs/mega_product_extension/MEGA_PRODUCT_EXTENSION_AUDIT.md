@@ -188,21 +188,21 @@ Improvements to setup, discoverability, and daily use.
 
 | ID | Opportunity | Category | Effort | Value | Wave |
 |----|-------------|----------|--------|-------|------|
-| PE-01 | `/standup` skill | New Skill | Low | High | 2 |
+| PE-01 | `/standup` skill | New Skill | Low | High | **2 ✓** |
 | PE-02 | `/debug` skill | New Skill | Medium | High | 3 |
-| PE-03 | `/migrate` skill | New Skill | Low | Medium | 2 |
+| PE-03 | `/migrate` skill | New Skill | Low | Medium | **2 ✓** |
 | PE-04 | `/triage` skill | New Skill | Medium | Medium | 3 |
 | PE-05 | `/onboard` skill | New Skill | Medium | Medium | 3 |
 | PE-06 | `browse record/replay` | Browser CLI | Medium | High | 3 |
 | PE-07 | `browse mock` | Browser CLI | Medium | High | 3 |
-| PE-08 | `browse a11y` | Browser CLI | Low-Med | High | 2 |
+| PE-08 | `browse a11y` | Browser CLI | Low-Med | High | **2 ✓** |
 | PE-09 | `browse perf --budget` | Browser CLI | Very Low | Medium | **1 ✓** |
-| PE-10 | `browse form-fill` | Browser CLI | Low | Medium | 2 |
-| PE-11 | `/qa --compare` | Enhanced Skill | Low | Medium | 2 |
+| PE-10 | `browse form-fill` | Browser CLI | Low | Medium | **2 ✓** |
+| PE-11 | `/qa --compare` | Enhanced Skill | Low | Medium | **2 ✓** |
 | PE-12 | `/ship --dry-run` | Enhanced Skill | Very Low | High | **1 ✓** |
 | PE-13 | `/review --focus` | Enhanced Skill | Very Low | Medium | **1 ✓** |
 | PE-14 | `/retro --person` | Enhanced Skill | Very Low | Medium | **1 ✓** |
-| PE-15 | `/qa-gate` | Cross-Skill | Low | High | 2 |
+| PE-15 | `/qa-gate` | Cross-Skill | Low | High | **2 ✓** |
 | PE-16 | `/plan` router | Cross-Skill | Trivial | Medium | **1 ✓** |
 | PE-17 | `gstack doctor` | Dev Experience | Very Low | High | **1 ✓** |
 
@@ -237,9 +237,9 @@ The following were considered and excluded as not "safe, obvious, adjacent":
 | Wave | Items | Status | Notes |
 |------|-------|--------|-------|
 | Wave 1 | PE-09, PE-12, PE-13, PE-14, PE-16, PE-17 | **COMPLETE** (2026-03-26) | All "Very Low" / "Trivial" effort. 4 commits. See `tasks/WAVE1.md`. |
-| Wave 2 | PE-01, PE-03, PE-08, PE-10, PE-11, PE-15 | pending | All "Low" effort items |
+| Wave 2 | PE-01, PE-03, PE-08, PE-10, PE-11, PE-15 | **COMPLETE** (2026-03-27) | All "Low" effort items. 1 commit. See `tasks/WAVE2.md`. |
 | Wave 3 | PE-02, PE-04, PE-05, PE-06, PE-07 | pending | "Medium" effort items |
 
 ---
 
-*Audit produced by Claude Sonnet 4.6 on 2026-03-26. Wave 1 executed 2026-03-26.*
+*Audit produced by Claude Sonnet 4.6 on 2026-03-26. Wave 1 executed 2026-03-26. Wave 2 executed 2026-03-27.*

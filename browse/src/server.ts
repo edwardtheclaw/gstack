@@ -43,6 +43,7 @@ function resolveStateDir(): string {
 const STATE_FILE = process.env.BROWSE_STATE_FILE || `${resolveStateDir()}/browse-server${INSTANCE_SUFFIX}.json`;
 const CRASH_LOG_PATH = `${STATE_DIR}/browse-crashes${INSTANCE_SUFFIX}.log`;
 const IDLE_TIMEOUT_MS = parseInt(process.env.BROWSE_IDLE_TIMEOUT || '1800000', 10); // 30 min
+const IDLE_CHECK_MS = parseInt(process.env.BROWSE_IDLE_CHECK_MS || '60000', 10); // check interval
 
 // ─── Structured Logging (O1) ────────────────────────────────
 function serverLog(level: 'INFO' | 'WARN' | 'ERROR', message: string) {
@@ -128,11 +129,11 @@ const idleCheckInterval = setInterval(() => {
     serverLog('INFO', `Idle for ${IDLE_TIMEOUT_MS / 1000}s, shutting down`);
     shutdown();
   }
-}, 60_000);
+}, IDLE_CHECK_MS);
 
 // ─── Command Sets (exported for chain command) ──────────────────
 export const READ_COMMANDS = new Set([
-  'text', 'html', 'links', 'forms', 'accessibility',
+  'text', 'html', 'links', 'forms', 'accessibility', 'a11y',
   'js', 'eval', 'css', 'attrs',
   'console', 'network', 'cookies', 'storage', 'perf',
   'dialog', 'is',
@@ -143,6 +144,7 @@ export const WRITE_COMMANDS = new Set([
   'click', 'fill', 'select', 'hover', 'type', 'press', 'scroll', 'wait',
   'viewport', 'cookie', 'cookie-import', 'cookie-import-browser', 'header', 'useragent',
   'upload', 'dialog-accept', 'dialog-dismiss',
+  'form-fill',
 ]);
 
 export const META_COMMANDS = new Set([

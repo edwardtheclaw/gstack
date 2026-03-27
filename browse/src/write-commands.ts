@@ -306,6 +306,126 @@ export async function handleWriteCommand(
       return `Cookie picker opened at ${pickerUrl}\nDetected browsers: ${browsers.map(b => b.name).join(', ')}\nSelect domains to import, then close the picker when done.`;
     }
 
+    case 'form-fill': {
+      // Enumerate all form fields, then fill each with contextually appropriate values
+      // Args: optional form index (default: 0), optional --strategy "description"
+      const strategyIdx = args.indexOf('--strategy');
+      const strategy = strategyIdx !== -1 ? args.slice(strategyIdx + 1).join(' ') : 'realistic test data';
+      const formIdxArg = args.find(a => /^\d+$/.test(a));
+      const targetFormIdx = formIdxArg !== undefined ? parseInt(formIdxArg, 10) : null;
+
+      // Get form fields (mirrors the `forms` read command)
+      const forms = await page.evaluate(() => {
+        return [...document.querySelectorAll('form')].map((form, i) => {
+          const fields = [...form.querySelectorAll('input, select, textarea')].map(el => {
+            const input = el as HTMLInputElement;
+            const label = input.labels?.[0]?.textContent?.trim() ||
+              input.getAttribute('aria-label') || input.getAttribute('placeholder') || '';
+            return {
+              tag: el.tagName.toLowerCase(),
+              type: input.type || undefined,
+              name: input.name || undefined,
+              id: input.id || undefined,
+              placeholder: input.placeholder || undefined,
+              label: label || undefined,
+              required: input.required || undefined,
+              options: el.tagName === 'SELECT'
+                ? [...(el as HTMLSelectElement).options].map(o => o.value).filter(v => v !== '')
+                : undefined,
+            };
+          });
+          return { index: i, id: form.id || undefined, fields };
+        });
+      });
+
+      if (forms.length === 0) throw new Error('No forms found on this page');
+
+      const formsToFill = targetFormIdx !== null
+        ? forms.filter(f => f.index === targetFormIdx)
+        : [forms[0]];
+
+      if (formsToFill.length === 0) throw new Error(`No form at index ${targetFormIdx}`);
+
+      // Generate fill values based on field metadata
+      function generateValue(field: {
+        type?: string; name?: string; label?: string;
+        placeholder?: string; options?: string[];
+      }): string | null {
+        const hint = `${field.label || ''} ${field.name || ''} ${field.placeholder || ''}`.toLowerCase();
+        const type = (field.type || 'text').toLowerCase();
+
+        if (type === 'checkbox' || type === 'radio') return null; // skip
+        if (type === 'file') return null; // skip
+        if (field.options && field.options.length > 0) return field.options[0]; // pick first option
+
+        if (type === 'email' || hint.includes('email')) return 'test@example.com';
+        if (type === 'tel' || hint.includes('phone') || hint.includes('tel')) return '+1 555-555-0100';
+        if (type === 'url' || hint.includes('url') || hint.includes('website')) return 'https://example.com';
+        if (type === 'number') {
+          if (hint.includes('age')) return '30';
+          if (hint.includes('zip') || hint.includes('postal')) return '94103';
+          if (hint.includes('price') || hint.includes('amount') || hint.includes('cost')) return '9.99';
+          return '42';
+        }
+        if (type === 'date') return '1990-01-15';
+        if (type === 'time') return '09:00';
+        if (type === 'color') return '#336699';
+        if (type === 'range') return '50';
+        if (type === 'password') return 'Test@1234!';
+        if (type === 'search') return 'test query';
+
+        // Text fields — use label/name hint
+        if (hint.includes('first') && hint.includes('name')) return 'Alice';
+        if (hint.includes('last') && hint.includes('name')) return 'Smith';
+        if (hint.includes('name') && !hint.includes('user')) return 'Alice Smith';
+        if (hint.includes('username') || hint.includes('user name')) return 'alice_smith';
+        if (hint.includes('city')) return 'San Francisco';
+        if (hint.includes('state') || hint.includes('province')) return 'CA';
+        if (hint.includes('country')) return 'United States';
+        if (hint.includes('zip') || hint.includes('postal')) return '94103';
+        if (hint.includes('address')) return '123 Main St';
+        if (hint.includes('company') || hint.includes('org')) return 'Acme Corp';
+        if (hint.includes('title') || hint.includes('subject')) return 'Test Subject';
+        if (hint.includes('comment') || hint.includes('message') || hint.includes('note') ||
+            hint.includes('description') || hint.includes('bio')) return 'This is a test message for QA purposes.';
+        if (hint.includes('code') || hint.includes('coupon')) return 'TEST2026';
+        return 'Test Value';
+      }
+
+      const filled: string[] = [];
+      const skipped: string[] = [];
+
+      for (const form of formsToFill) {
+        for (const field of form.fields) {
+          if (field.type === 'hidden' || field.type === 'submit' ||
+              field.type === 'button' || field.type === 'reset' || field.type === 'image') continue;
+
+          const value = generateValue(field);
+          if (value === null) { skipped.push(field.name || field.id || field.type || 'field'); continue; }
+
+          const selector = field.id ? `#${field.id}` :
+            field.name ? `[name="${field.name}"]` : null;
+          if (!selector) { skipped.push('(no selector)'); continue; }
+
+          try {
+            if (field.tag === 'select') {
+              await page.selectOption(selector, value, { timeout: 3000 });
+            } else {
+              await page.fill(selector, value, { timeout: 3000 });
+            }
+            filled.push(`${selector} = "${value}"`);
+          } catch {
+            skipped.push(selector);
+          }
+        }
+      }
+
+      const lines = [`form-fill: filled ${filled.length} field${filled.length === 1 ? '' : 's'} (strategy: ${strategy})`];
+      for (const f of filled) lines.push(`  ✓ ${f}`);
+      if (skipped.length > 0) lines.push(`  skipped: ${skipped.join(', ')}`);
+      return lines.join('\n');
+    }
+
     default:
       throw new Error(`Unknown write command: ${command}`);
   }

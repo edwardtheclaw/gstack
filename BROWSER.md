@@ -7,9 +7,9 @@ This document covers the command reference and internals of gstack's headless br
 | Category | Commands | What for |
 |----------|----------|----------|
 | Navigate | `goto`, `back`, `forward`, `reload`, `url` | Get to a page |
-| Read | `text`, `html`, `links`, `forms`, `accessibility` | Extract content |
+| Read | `text`, `html`, `links`, `forms`, `accessibility`, `a11y` | Extract content; `a11y` runs structured accessibility audit |
 | Snapshot | `snapshot [-i] [-c] [-d N] [-s sel] [-D] [-a] [-o] [-C]` | Get refs, diff, annotate |
-| Interact | `click`, `fill`, `select`, `hover`, `type`, `press`, `scroll`, `wait`, `viewport`, `upload` | Use the page |
+| Interact | `click`, `fill`, `select`, `hover`, `type`, `press`, `scroll`, `wait`, `viewport`, `upload`, `form-fill` | Use the page; `form-fill` auto-fills all form fields with test data |
 | Inspect | `js`, `eval`, `css`, `attrs`, `is`, `console`, `network`, `dialog`, `cookies`, `storage`, `perf [--budget key=ms,...]` | Debug and verify |
 | Visual | `screenshot`, `pdf`, `responsive` | See what Claude sees |
 | Compare | `diff <url1> <url2>` | Spot differences between environments |

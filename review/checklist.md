@@ -110,6 +110,13 @@ CRITICAL (blocks /ship):          INFORMATIONAL (in PR body):
                                    └─ View/Frontend
 ```
 
+#### Database Migrations
+- `change` method with `remove_column`, `drop_table`, or `change_column` — not auto-reversible; requires explicit `down` block
+- `NOT NULL` constraint added to an existing column without a default **and** without a prior backfill in the same diff
+- Foreign key column added without an index (`add_reference` without `index: true`, or bare `add_column :*_id` without `add_index`)
+- `execute("UPDATE ...")` or `Model.update_all(...)` inside a migration with no batching — full-table lock
+- Zero-downtime issues: dropping/renaming a column/table before app code ignores the old name; adding FK with `validate: true` on large tables
+
 ---
 
 ## Suppressions — DO NOT flag these
