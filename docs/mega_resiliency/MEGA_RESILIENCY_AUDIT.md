@@ -386,17 +386,17 @@ If a user clones gstack to two locations and runs both, they compete for ports 9
 | 5 | Fix idle timeout to exclude `/health` requests (R12) | `server.ts` | Low | ✅ Done — `/health` no longer resets idle timer |
 | 6 | Add crash log file (O5) | `browser-manager.ts`, `server.ts` | Low | ✅ Done — appends to `browse-crashes.log` on disconnect |
 
-### Wave 4 — Test Coverage (1–2 weeks)
+### Wave 4 — Test Coverage ✅ COMPLETED 2026-03-27
 
-| # | Item | Files |
-|---|------|-------|
-| 1 | Path traversal prevention tests (MT1) | `browse/test/` |
-| 2 | Auth token enforcement tests (MT2) | `browse/test/` |
-| 3 | Ref-map staleness after navigation tests (MT4) | `browse/test/` |
-| 4 | `chain` malformed input tests (MT5) | `browse/test/` |
-| 5 | Idle timeout test with short `BROWSE_IDLE_TIMEOUT` (MT7) | `browse/test/` |
-| 6 | `diff` URL restoration test (MT8) | `browse/test/` |
-| 7 | snapshot.ts unit tests for ref assignment algorithm (TD1) | `browse/test/` |
+| # | Item | Files | Status |
+|---|------|-------|--------|
+| 1 | Path traversal prevention tests (MT1) | `browse/test/commands.test.ts` | ✅ Already done (PR #26) |
+| 2 | Auth token enforcement tests (MT2) | `browse/test/auth.test.ts` | ✅ Done — 401/200/case-sensitivity/health |
+| 3 | Ref-map staleness after navigation tests (MT4) | `browse/test/snapshot.test.ts` | ✅ Already done (Ref invalidation block) |
+| 4 | `chain` malformed input tests (MT5) | `browse/test/commands.test.ts` | ✅ Done — non-array JSON, empty array, per-step errors |
+| 5 | Idle timeout test with short `BROWSE_IDLE_TIMEOUT` (MT7) | `browse/test/auth.test.ts` | ✅ Done — BROWSE_IDLE_CHECK_MS added to server.ts |
+| 6 | `diff` URL restoration test (MT8) | `browse/test/commands.test.ts` | ✅ Done — documents browser-left-on-url2 behavior |
+| 7 | snapshot.ts unit tests for ref assignment algorithm (TD1) | `browse/test/snapshot.test.ts` | ✅ Done — duplicate-refs fixture + 5 algorithm tests |
 
 ### Wave 5 — Tech Debt & Architecture (2–4 weeks)
 

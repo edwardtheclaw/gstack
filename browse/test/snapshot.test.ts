@@ -389,6 +389,93 @@ describe('Snapshot errors', () => {
   });
 });
 
+// ─── Ref Assignment Algorithm (TD1) ─────────────────────────────
+//
+// Tests the two-pass ref assignment algorithm: duplicate role+name pairs
+// must receive distinct @eN refs and interact correctly via nth() disambiguation.
+
+describe('Ref assignment algorithm', () => {
+  test('duplicate-name buttons each get a distinct @ref', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    // All three "Add" buttons should appear in the snapshot
+    const addLines = snap.split('\n').filter(l => l.includes('[button]') && l.includes('"Add"'));
+    expect(addLines.length).toBe(3);
+    // Each line must have a unique ref
+    const refs = addLines.map(l => { const m = l.match(/@(e\d+)/); return m?.[1]; });
+    const unique = new Set(refs.filter(Boolean));
+    expect(unique.size).toBe(3);
+  });
+
+  test('refs are numbered sequentially from @e1', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    const refNums = [...snap.matchAll(/@e(\d+)/g)].map(m => parseInt(m[1], 10));
+    // Must start at 1
+    expect(Math.min(...refNums)).toBe(1);
+    // Must be sequential (no gaps)
+    const sorted = [...refNums].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      expect(sorted[i + 1] - sorted[i]).toBe(1);
+    }
+  });
+
+  test('clicking each duplicate-name ref affects the correct element', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+
+    const addLines = snap.split('\n').filter(l => l.includes('[button]') && l.includes('"Add"'));
+    expect(addLines.length).toBe(3);
+
+    // Click the second "Add" button by its ref
+    const secondRef = addLines[1].match(/@(e\d+)/)?.[1];
+    expect(secondRef).toBeDefined();
+    await handleWriteCommand('click', [`@${secondRef!}`], bm);
+
+    // Only btn-b (index 1) should have data-clicked="1"
+    const clickedA = await handleReadCommand('js', ['document.getElementById("btn-a").getAttribute("data-clicked")'], bm);
+    const clickedB = await handleReadCommand('js', ['document.getElementById("btn-b").getAttribute("data-clicked")'], bm);
+    const clickedC = await handleReadCommand('js', ['document.getElementById("btn-c").getAttribute("data-clicked")'], bm);
+
+    expect(clickedA).toBe('null');
+    expect(clickedB).toBe('1');
+    expect(clickedC).toBe('null');
+  });
+
+  test('duplicate-name links each get a distinct @ref', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    const detailsLines = snap.split('\n').filter(l => l.includes('[link]') && l.includes('"Details"'));
+    expect(detailsLines.length).toBe(2);
+    const refs = detailsLines.map(l => l.match(/@(e\d+)/)?.[1]);
+    expect(refs[0]).not.toBe(refs[1]);
+  });
+
+  test('second snapshot resets refs from @e1 (fresh ref counter)', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap1 = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    const snap2 = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    // Both snapshots should start at @e1
+    expect(snap1).toMatch(/@e1\b/);
+    expect(snap2).toMatch(/@e1\b/);
+    // And both should have the same ref count
+    const count1 = (snap1.match(/@e\d+/g) || []).length;
+    const count2 = (snap2.match(/@e\d+/g) || []).length;
+    expect(count1).toBe(count2);
+  });
+
+  test('unique button gets a single ref not shared with duplicates', async () => {
+    await handleWriteCommand('goto', [baseUrl + '/duplicate-refs.html'], bm);
+    const snap = await handleMetaCommand('snapshot', ['-i'], bm, shutdown);
+    const uniqueLines = snap.split('\n').filter(l => l.includes('[button]') && l.includes('"Unique"'));
+    expect(uniqueLines.length).toBe(1);
+    const uniqueRef = uniqueLines[0].match(/@(e\d+)/)?.[1];
+    expect(uniqueRef).toBeDefined();
+    const result = await handleWriteCommand('click', [`@${uniqueRef!}`], bm);
+    expect(result).toContain('Clicked');
+  });
+});
+
 // ─── Combined Flags ─────────────────────────────────────────────
 
 describe('Snapshot combined flags', () => {

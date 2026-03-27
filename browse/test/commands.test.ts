@@ -383,6 +383,17 @@ describe('Diff', () => {
     expect(result).toContain('Hello World');
     expect(result).toContain('Form Test Page');
   });
+
+  test('diff leaves browser on url2 after comparison (MT8)', async () => {
+    // Start on a third page so we can verify the browser moves
+    await handleWriteCommand('goto', [baseUrl + '/empty.html'], bm);
+    const url1 = baseUrl + '/basic.html';
+    const url2 = baseUrl + '/forms.html';
+    await handleMetaCommand('diff', [url1, url2], bm, async () => {});
+    // After diff the browser should be on url2, not url1 or the original page
+    const currentUrl = await handleMetaCommand('url', [], bm, async () => {});
+    expect(currentUrl).toContain('/forms.html');
+  });
 });
 
 // ─── Chain ──────────────────────────────────────────────────────
@@ -1104,6 +1115,32 @@ describe('Errors', () => {
     } catch (err: any) {
       expect(err.message).toContain('Usage');
     }
+  });
+
+  test('chain with non-array JSON throws (MT5)', async () => {
+    try {
+      await handleMetaCommand('chain', ['{"command":"goto"}'], bm, async () => {});
+      expect(true).toBe(false);
+    } catch (err: any) {
+      expect(err.message).toContain('Expected JSON array');
+    }
+  });
+
+  test('chain with empty array returns empty output (MT5)', async () => {
+    const result = await handleMetaCommand('chain', ['[]'], bm, async () => {});
+    expect(result).toBe('');
+  });
+
+  test('chain with unknown command reports error per-step (MT5)', async () => {
+    const commands = JSON.stringify([
+      ['goto', baseUrl + '/basic.html'],
+      ['not-a-command', 'arg'],
+      ['url'],
+    ]);
+    const result = await handleMetaCommand('chain', [commands], bm, async () => {});
+    expect(result).toContain('[goto]');
+    expect(result).toContain('[not-a-command] ERROR:');
+    expect(result).toContain('[url]');
   });
 
   test('unknown read command throws', async () => {

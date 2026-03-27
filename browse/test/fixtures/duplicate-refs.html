@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Duplicate Refs Test</title>
+</head>
+<body>
+  <h1>Duplicate Refs Test</h1>
+
+  <!-- Three buttons with the same name — ref algorithm must use nth() to disambiguate -->
+  <button id="btn-a" class="add-btn">Add</button>
+  <button id="btn-b" class="add-btn">Add</button>
+  <button id="btn-c" class="add-btn">Add</button>
+
+  <!-- Two links with the same text -->
+  <a href="#section1" id="link-a">Details</a>
+  <a href="#section2" id="link-b">Details</a>
+
+  <!-- Unique button for reference -->
+  <button id="unique-btn">Unique</button>
+
+  <script>
+    document.querySelectorAll('.add-btn').forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        btn.setAttribute('data-clicked', String(i));
+      });
+    });
+  </script>
+</body>
+</html>

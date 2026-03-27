@@ -40,7 +40,8 @@ function resolveStateDir(): string {
   return '/tmp';
 }
 
-const STATE_FILE = process.env.BROWSE_STATE_FILE || `${resolveStateDir()}/browse-server${INSTANCE_SUFFIX}.json`;
+const STATE_DIR = resolveStateDir();
+const STATE_FILE = process.env.BROWSE_STATE_FILE || `${STATE_DIR}/browse-server${INSTANCE_SUFFIX}.json`;
 const CRASH_LOG_PATH = `${STATE_DIR}/browse-crashes${INSTANCE_SUFFIX}.log`;
 const IDLE_TIMEOUT_MS = parseInt(process.env.BROWSE_IDLE_TIMEOUT || '1800000', 10); // 30 min
 const IDLE_CHECK_MS = parseInt(process.env.BROWSE_IDLE_CHECK_MS || '60000', 10); // check interval
@@ -61,7 +62,6 @@ function validateAuth(req: Request): boolean {
 import { consoleBuffer, networkBuffer, dialogBuffer, addConsoleEntry, addNetworkEntry, addDialogEntry, type LogEntry, type NetworkEntry, type DialogEntry } from './buffers';
 export { consoleBuffer, networkBuffer, dialogBuffer, addConsoleEntry, addNetworkEntry, addDialogEntry, type LogEntry, type NetworkEntry, type DialogEntry };
 
-const STATE_DIR = resolveStateDir();
 const CONSOLE_LOG_PATH = `${STATE_DIR}/browse-console${INSTANCE_SUFFIX}.log`;
 const NETWORK_LOG_PATH = `${STATE_DIR}/browse-network${INSTANCE_SUFFIX}.log`;
 const DIALOG_LOG_PATH = `${STATE_DIR}/browse-dialog${INSTANCE_SUFFIX}.log`;
@@ -259,7 +259,16 @@ async function shutdown() {
   clearInterval(idleCheckInterval);
   await flushBuffers(); // Final flush (async now)
 
+  // Failsafe: force exit if browser.close() hangs (e.g. Playwright WebSocket stall)
+  const forceExit = setTimeout(() => {
+    serverLog('WARN', 'Shutdown timed out — forcing exit');
+    try { fs.unlinkSync(STATE_FILE); } catch {}
+    process.exit(0);
+  }, 8000);
+  if (typeof (forceExit as any).unref === 'function') (forceExit as any).unref();
+
   await browserManager.close();
+  clearTimeout(forceExit);
 
   // Clean up state file
   try { fs.unlinkSync(STATE_FILE); } catch {}
