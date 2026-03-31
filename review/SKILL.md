@@ -75,23 +75,6 @@ Follow the output format specified in the checklist. Respect the suppressions �
 
 ---
 
-## Step 5: Output findings
-
-**Always output ALL findings** — both critical and informational. The user must see every issue.
-
-- If CRITICAL issues found: output all findings, then for EACH critical issue use a separate AskUserQuestion with the problem, your recommended fix, and options (A: Fix it now, B: Acknowledge, C: False positive — skip).
-  After all critical questions are answered, output a summary of what the user chose for each issue. If the user chose A (fix) on any issue, apply the recommended fixes. If only B/C were chosen, no action needed.
-- If only non-critical issues found: output findings. No further action needed.
-- If no issues found: output `Pre-Landing Review: No issues found.`
-
----
-
-## Important Rules
-
-/root/projects/gstack/review/SKILL.md
-
----
-
 ## Step 4.5: Visual Review (Screenshots)
 
 During code review:
@@ -109,3 +92,23 @@ gstack-upload /tmp/review-page.png
 ```
 
 Embed the URL in your review comment for visual context.
+
+---
+
+## Step 5: Output findings
+
+**Always output ALL findings** — both critical and informational. The user must see every issue.
+
+- If CRITICAL issues found: output all findings, then for EACH critical issue use a separate AskUserQuestion with the problem, your recommended fix, and options (A: Fix it now, B: Acknowledge, C: False positive — skip).
+  After all critical questions are answered, output a summary of what the user chose for each issue. If the user chose A (fix) on any issue, apply the recommended fixes. If only B/C were chosen, no action needed.
+- If only non-critical issues found: output findings. No further action needed.
+- If no issues found: output `Pre-Landing Review: No issues found.`
+
+---
+
+## Important Rules
+
+- **Read the FULL diff before commenting.** Do not flag issues already addressed in the diff.
+- **Read-only by default.** Only modify files if the user explicitly chooses "Fix it now" on a critical issue. Never commit, push, or create PRs.
+- **Be terse.** One line problem, one line fix. No preamble.
+- **Only flag real problems.** Skip anything that's fine.
