@@ -406,6 +406,25 @@ Small, practical, realistic. Each must be something that takes <5 minutes to ado
 
 ---
 
+## Deployment Health Tracking
+
+After each deploy-verify run, record the health result:
+1. Run deploy-verify on the deployed URL
+2. Log the result: timestamp, URL, pass/fail, health score, screenshot path
+3. Over time, build a deployment health history
+4. Before deploys, check the trend - if recent deploys degraded health, flag risk
+
+Storage: Append results to `.deploy-health.jsonl` in the project root.
+
+Format per line:
+```json
+{"ts": "2026-03-31T03:00:00Z", "url": "...", "pass": true, "score": 85, "screenshot": "/tmp/..."}
+```
+
+Review trends with: `cat .deploy-health.jsonl | tail -10`
+
+---
+
 ## Compare Mode
 
 When the user runs `/retro compare` (or `/retro compare 14d`):
