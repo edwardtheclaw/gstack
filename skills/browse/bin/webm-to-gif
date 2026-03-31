@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#
+# webm-to-gif - Convert WebM video to animated GIF
+# Usage: webm-to-gif input.webm output.gif
+
+set -euo pipefail
+
+# Display usage
+usage() {
+    echo "Usage: $0 input.webm output.gif"
+    echo "Convert WebM video to animated GIF, scaling to max 800px width."
+    exit 1
+}
+
+# Check arguments
+if [ "$#" -ne 2 ]; then
+    echo "Error: Expected 2 arguments, got $#"
+    usage
+fi
+
+INPUT="$1"
+OUTPUT="$2"
+
+# Check if ffmpeg is available
+if ! command -v ffmpeg >/dev/null 2>&1; then
+    echo "Error: ffmpeg not found in PATH"
+    exit 2
+fi
+
+# Check if input file exists
+if [ ! -f "$INPUT" ]; then
+    echo "Error: Input file '$INPUT' does not exist"
+    exit 3
+fi
+
+# Extract extension for input validation (optional)
+if [[ "$INPUT" != *.webm ]] && [[ "$INPUT" != *.WEBM ]]; then
+    echo "Warning: Input file '$INPUT' may not be a WebM video (missing .webm extension)"
+fi
+
+# Perform conversion with scaling to max 800px width
+# Using palettegen and paletteuse for better GIF quality
+ffmpeg -i "$INPUT" \
+    -vf "scale='min(800,iw)':-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" \
+    -loop 0 \
+    "$OUTPUT"
+
+echo "Conversion complete: '$OUTPUT' created"
