@@ -88,7 +88,24 @@ Follow the output format specified in the checklist. Respect the suppressions â€
 
 ## Important Rules
 
-- **Read the FULL diff before commenting.** Do not flag issues already addressed in the diff.
-- **Read-only by default.** Only modify files if the user explicitly chooses "Fix it now" on a critical issue. Never commit, push, or create PRs.
-- **Be terse.** One line problem, one line fix. No preamble.
-- **Only flag real problems.** Skip anything that's fine.
+/root/projects/gstack/review/SKILL.md
+
+---
+
+## Step 4.5: Visual Review (Screenshots)
+
+During code review:
+1. Identify changed routes from the PR diff
+2. Navigate to each changed route using browse
+3. Capture annotated screenshots with `screenshot --annotate`
+4. Upload via `gstack-upload`
+5. Add screenshots to PR review comment as markdown images
+
+Example:
+```
+browse goto <changed-route-url>
+browse screenshot /tmp/review-page.png --annotate
+gstack-upload /tmp/review-page.png
+```
+
+Embed the URL in your review comment for visual context.

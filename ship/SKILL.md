@@ -317,3 +317,20 @@ EOF
 - **Date format in CHANGELOG:** `YYYY-MM-DD`
 - **Split commits for bisectability** — each commit = one logical change.
 - **The goal is: user says `/ship`, next thing they see is the review + PR URL.**
+
+## Step 7.5: Visual Verification (Post-Deploy)
+
+After deployment:
+1. Navigate to the deployed URL using browse
+2. Capture screenshots of key pages with `screenshot --annotate`
+3. Upload screenshots via `gstack-upload`
+4. Edit the PR body to embed screenshot URLs as markdown images
+
+Example:
+```
+browse goto <deployed-url>
+browse screenshot /tmp/deploy-verify.png --annotate
+gstack-upload /tmp/deploy-verify.png
+```
+
+Then add the returned URL to the PR body.
