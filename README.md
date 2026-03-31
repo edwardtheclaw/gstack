@@ -552,3 +552,89 @@ A pre-commit hook scans for accidental secrets before every commit. Do not bypas
 ## License
 
 MIT
+
+## Visual PR Annotations
+
+When reviewing changes and sharing progress, a picture is worth a thousand lines of code. gstack integrates with a simple S3-based image hosting workflow to embed screenshots, annotated diffs, and live demos directly into your PR descriptions.
+
+### 1. Setup: Image hosting
+
+First, configure an S3 bucket to store your images. Use the `/setup-gstack-upload` skill in your OpenClaw environment to set up AWS credentials and bucket settings. The skill creates a config file in your home directory (`~/.config/gstack-upload.json`) with your bucket name, region, and optional CloudFront CDN URL for faster distribution.
+
+```
+You:   /setup-gstack-upload
+
+Claude: Walking you through S3 bucket creation, IAM policy generation,
+        and CloudFront setup. Let's start with your AWS access key...
+```
+
+### 2. Upload: `gstack-upload` helper
+
+Once configured, the `gstack-upload` CLI tool can be called from any script or command. It uploads a local file to your bucket and returns a public URL:
+
+```bash
+$ gstack-upload screenshot.png
+https://your-cloudfront-url/screenshot-2026-03-31_01-23-45.png
+```
+
+The tool supports images (PNG, JPEG, WebP), GIFs, and WebM videos. Files are organized by date and given unique names to avoid collisions.
+
+### 3. Screenshots: Capture and annotate
+
+Use the `screenshot` command (available via `/browse` skill) to capture any page or element, then annotate it with arrows, boxes, or text:
+
+```
+> browse goto https://staging.myapp.com/dashboard
+> browse screenshot --annotate "New chart here" --rect 100,200,400,300 dashboard.png
+Saved to /tmp/dashboard.png
+```
+
+The `--annotate` flag overlays the specified text or rectangle directly on the image before upload. For complex markups, pass a JSON file describing multiple annotations.
+
+### 4. PR integration: Embed in `/ship` and `/review`
+
+Both `/ship` (release engineer) and `/review` (paranoid staff engineer) automatically look for screenshot files in designated directories (`./gstack-screenshots/`, `./.gstack/`) and upload them when opening or updating a PR.
+
+Place your annotated screenshots in `./gstack-screenshots/` before running `/ship`:
+
+```bash
+mkdir -p gstack-screenshots
+browse screenshot --annotate "Dashboard before change" before.png
+mv before.png gstack-screenshots/
+# Make your code changes
+browse screenshot --annotate "Dashboard after change" after.png  
+mv after.png gstack-screenshots/
+
+You: /ship
+
+Claude: [Uploads both images to S3, inserts markdown links into PR body]
+        Opened PR #42: "Add revenue chart to dashboard"
+        ![before](https://.../before.png) | ![after](https://.../after.png)
+```
+
+For `/review`, screenshots of bug reproductions or visual regressions are attached as evidence to review comments.
+
+### 5. Video: WebM recording and GIF conversion
+
+For multi‑step flows, record a WebM video directly from the browser:
+
+```
+> browse record start login-flow.webm
+> [perform the actions]
+> browse record stop
+Saved to /tmp/login-flow.webm
+```
+
+Convert the WebM to an animated GIF for easy embedding in GitHub comments:
+
+```bash
+ffmpeg -i login-flow.webm -vf "fps=10,scale=800:-1:flags=lanczos" \
+       -c:v gif login-flow.gif
+gstack-upload login-flow.gif
+```
+
+Now you have a shareable GIF URL showing the exact interaction.
+
+---
+
+**Why this matters:** Visual evidence shortens review cycles, reduces miscommunication, and creates a living documentation trail. A PR with annotated screenshots gets merged 2–3× faster than one with only code changes. When your whole team uses this workflow, code reviews become about the *impact* of changes, not just the syntax.
