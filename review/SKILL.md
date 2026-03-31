@@ -95,6 +95,32 @@ Embed the URL in your review comment for visual context.
 
 ---
 
+## Step 5.5: Visual Diff Comparison
+
+For UI-heavy changes, compare production vs PR branch:
+1. Capture a screenshot of the production version of changed routes
+2. Deploy or preview the PR branch locally
+3. Capture a screenshot of the PR branch version
+4. Upload both screenshots and include side-by-side in review comment
+
+```
+# Production screenshot
+browse goto <production-url>
+browse screenshot /tmp/prod-page.png --annotate
+
+# PR branch screenshot (if preview available)
+browse goto <preview-url>
+browse screenshot /tmp/pr-page.png --annotate
+
+# Upload and compare
+gstack-upload /tmp/prod-page.png
+gstack-upload /tmp/pr-page.png
+```
+
+Include both URLs in your review comment for visual comparison.
+
+---
+
 ## Step 5: Output findings
 
 **Always output ALL findings** — both critical and informational. The user must see every issue.
