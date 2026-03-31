@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    echo "Usage: $0 <local-file>"
+    echo "Upload local-file to S3 bucket defined in ~/.gstack/upload.json"
+    echo "Output: Public URL"
+    exit 1
+}
+
+die() { echo "Error: $*" >&2; exit 1; }
+
+[ $# -eq 1 ] || { echo "Error: Expected 1 argument, got $#" >&2; usage; }
+
+LOCAL_FILE="$1"
+CONFIG="$HOME/.gstack/upload.json"
+[ -f "$CONFIG" ] || die "Config $CONFIG not found. Run setup-gstack-upload skill."
+[ -f "$LOCAL_FILE" ] || die "Local file '$LOCAL_FILE' does not exist."
+command -v jq >/dev/null || die "jq not found in PATH. Install jq to parse JSON config."
+
+BUCKET=$(jq -r '.bucket' "$CONFIG")
+ACCESS_KEY=$(jq -r '.accessKeyId' "$CONFIG")
+SECRET_KEY=$(jq -r '.secretAccessKey' "$CONFIG")
+REGION=$(jq -r '.region' "$CONFIG")
+BASE_URL=$(jq -r '.baseUrl' "$CONFIG")
+PREFIX=$(jq -r '.prefix // ""' "$CONFIG")
+
+[ -n "$BUCKET" ] && [ "$BUCKET" != "null" ] || die "Missing or invalid 'bucket' in config."
+[ -n "$ACCESS_KEY" ] && [ "$ACCESS_KEY" != "null" ] || die "Missing or invalid 'accessKeyId' in config."
+[ -n "$SECRET_KEY" ] && [ "$SECRET_KEY" != "null" ] || die "Missing or invalid 'secretAccessKey' in config."
+
+REGION=${REGION:-us-east-1}
+[ "$REGION" = "null" ] && REGION=us-east-1
+BASE_URL=${BASE_URL:-https://${BUCKET}.s3.${REGION}.amazonaws.com}
+[ "$BASE_URL" = "null" ] && BASE_URL="https://${BUCKET}.s3.${REGION}.amazonaws.com"
+
+FILENAME=$(basename "$LOCAL_FILE")
+if [ -n "$PREFIX" ] && [ "$PREFIX" != "null" ]; then
+    PREFIX="${PREFIX%/}/"
+    S3_KEY="${PREFIX}${FILENAME}"
+else
+    S3_KEY="$FILENAME"
+fi
+
+export AWS_ACCESS_KEY_ID="$ACCESS_KEY"
+export AWS_SECRET_ACCESS_KEY="$SECRET_KEY"
+export AWS_REGION="$REGION"
+
+aws s3 cp "$LOCAL_FILE" "s3://$BUCKET/$S3_KEY" --acl public-read || \
+    die "Upload failed."
+
+PUBLIC_URL="${BASE_URL%/}/${S3_KEY}"
+echo "$PUBLIC_URL"
+exit 0
