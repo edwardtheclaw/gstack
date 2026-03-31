@@ -334,3 +334,17 @@ gstack-upload /tmp/deploy-verify.png
 ```
 
 Then add the returned URL to the PR body.
+
+## Step 8: Post-Deploy Health Check
+
+After visual verification, run a quick health check:
+1. Use the deploy-verify skill to smoke-test the deployed URL
+2. Check for: page loads, no console errors, key elements present
+3. If health check fails, flag in the PR and consider reverting
+
+```
+# Run deploy-verify on the deployed URL
+deploy-verify <deployed-url>
+```
+
+If the deploy-verify skill reports failures, add a warning comment to the PR.
