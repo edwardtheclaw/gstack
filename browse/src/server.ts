@@ -145,6 +145,7 @@ export const WRITE_COMMANDS = new Set([
   'viewport', 'cookie', 'cookie-import', 'cookie-import-browser', 'header', 'useragent',
   'upload', 'dialog-accept', 'dialog-dismiss',
   'form-fill', 'state-save', 'state-load', 'session', 'frame',
+  'vault', 'login', 'device',
 ]);
 
 export const META_COMMANDS = new Set([

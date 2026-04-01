@@ -7,12 +7,27 @@
 
 import type { BrowserManager } from './browser-manager';
 import { SessionManager } from './session-manager';
+import { addCredential, removeCredential, listNames, getCredential } from './vault';
 import { findInstalledBrowsers, importCookies } from './cookie-import-browser';
+import { devices } from 'playwright';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Lazy-initialized session manager (created on first session command)
 let sessionManager: SessionManager | null = null;
+
+// Vault master key (set once per session via vault unlock or env)
+let vaultMasterKey: string | null = process.env.BROWSE_VAULT_KEY || null;
+const VAULT_PATH = process.env.BROWSE_VAULT_PATH || '/tmp/browse-vault.enc';
+
+// Custom device presets for devices not in Playwright's built-in list
+const CUSTOM_DEVICES: Record<string, { viewport: { width: number; height: number }; userAgent: string; isMobile: boolean; hasTouch: boolean; deviceScaleFactor: number }> = {
+  'iPhone 16': { viewport: { width: 393, height: 852 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  'iPhone 16 Pro': { viewport: { width: 402, height: 874 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  'iPhone 16 Pro Max': { viewport: { width: 440, height: 956 }, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  'Pixel 9': { viewport: { width: 412, height: 915 }, userAgent: 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36', isMobile: true, hasTouch: true, deviceScaleFactor: 2.625 },
+  'iPad Pro 13': { viewport: { width: 1032, height: 1376 }, userAgent: 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1', isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+};
 
 export async function handleWriteCommand(
   command: string,
@@ -542,6 +557,127 @@ export async function handleWriteCommand(
       if (!frame) throw new Error(`Element '${selector}' is not an iframe`);
       const frameUrl = frame.url();
       return `Switched to frame '${selector}' → ${frameUrl}`;
+    }
+
+    case 'vault': {
+      const subCommand = args[0];
+      if (!subCommand) throw new Error('Usage: browse vault <add|remove|list|unlock> [args]');
+
+      switch (subCommand) {
+        case 'unlock': {
+          const key = args[1];
+          if (!key) throw new Error('Usage: browse vault unlock <master-key>');
+          vaultMasterKey = key;
+          return 'Vault unlocked';
+        }
+        case 'add': {
+          const name = args[1];
+          const username = args[2];
+          const password = args[3];
+          if (!name || !username || !password) throw new Error('Usage: browse vault add <name> <username> <password>');
+          if (!vaultMasterKey) throw new Error('Vault locked. Run: browse vault unlock <master-key>');
+          addCredential(name, username, password, vaultMasterKey, VAULT_PATH);
+          return `Credential '${name}' saved (user: ${username})`;
+        }
+        case 'remove': {
+          const name = args[1];
+          if (!name) throw new Error('Usage: browse vault remove <name>');
+          if (!vaultMasterKey) throw new Error('Vault locked. Run: browse vault unlock <master-key>');
+          removeCredential(name, vaultMasterKey, VAULT_PATH);
+          return `Credential '${name}' removed`;
+        }
+        case 'list': {
+          if (!vaultMasterKey) throw new Error('Vault locked. Run: browse vault unlock <master-key>');
+          const names = listNames(vaultMasterKey, VAULT_PATH);
+          if (names.length === 0) return 'Vault is empty';
+          return `Vault credentials: ${names.join(', ')}`;
+        }
+        default:
+          throw new Error(`Unknown vault sub-command: ${subCommand}. Use add|remove|list|unlock`);
+      }
+    }
+
+    case 'login': {
+      const name = args[0];
+      if (!name) throw new Error('Usage: browse login <credential-name>');
+      if (!vaultMasterKey) throw new Error('Vault locked. Run: browse vault unlock <master-key>');
+
+      const cred = getCredential(name, vaultMasterKey, VAULT_PATH);
+
+      // Find username and password fields on the page
+      const filled: string[] = [];
+      const selectors = {
+        username: [
+          'input[type="email"]', 'input[name="email"]', 'input[name="username"]',
+          'input[name="user"]', 'input[name="login"]', 'input[id="username"]',
+          'input[id="email"]', 'input[type="text"][autocomplete="username"]',
+        ],
+        password: [
+          'input[type="password"]', 'input[name="password"]', 'input[name="pass"]',
+        ],
+      };
+
+      for (const sel of selectors.username) {
+        try {
+          const el = await page.$(sel);
+          if (el) {
+            await el.fill(cred.username);
+            filled.push('username');
+            break;
+          }
+        } catch {}
+      }
+
+      for (const sel of selectors.password) {
+        try {
+          const el = await page.$(sel);
+          if (el) {
+            await el.fill(cred.password);
+            filled.push('password');
+            break;
+          }
+        } catch {}
+      }
+
+      if (filled.length === 0) throw new Error('No login fields found on page');
+      // Never expose credentials in output
+      return `Login '${name}': filled ${filled.join(' + ')}`;
+    }
+
+    case 'device': {
+      const name = args.join(' ');
+      if (!name) {
+        // List available devices
+        const builtIn = Object.keys(devices).filter(n => !n.includes('landscape')).slice(0, 15);
+        const custom = Object.keys(CUSTOM_DEVICES);
+        return `Built-in (sample): ${builtIn.join(', ')}\nCustom: ${custom.join(', ')}\nUse: browse device <name>`;
+      }
+
+      // Check custom devices first, then built-in
+      let preset = CUSTOM_DEVICES[name] || (devices as any)[name];
+      if (!preset) {
+        // Try case-insensitive match
+        const lowerName = name.toLowerCase();
+        const match = [...Object.keys(CUSTOM_DEVICES), ...Object.keys(devices)]
+          .find(k => k.toLowerCase() === lowerName);
+        if (match) {
+          preset = CUSTOM_DEVICES[match] || (devices as any)[match];
+        }
+      }
+
+      if (!preset) throw new Error(`Unknown device: "${name}". Run 'browse device' to list available devices.`);
+
+      // Apply device settings
+      if (preset.viewport) {
+        await bm.setViewport(preset.viewport.width, preset.viewport.height);
+      }
+      if (preset.userAgent) {
+        bm.setUserAgent(preset.userAgent);
+        await bm.recreateContext();
+      }
+
+      const vp = preset.viewport || { width: '?', height: '?' };
+      return `Device set: ${name} (${vp.width}x${vp.height}, mobile=${preset.isMobile || false})`;
     }
 
     default:
