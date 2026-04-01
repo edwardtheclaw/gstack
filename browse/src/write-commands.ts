@@ -6,9 +6,13 @@
  */
 
 import type { BrowserManager } from './browser-manager';
+import { SessionManager } from './session-manager';
 import { findInstalledBrowsers, importCookies } from './cookie-import-browser';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Lazy-initialized session manager (created on first session command)
+let sessionManager: SessionManager | null = null;
 
 export async function handleWriteCommand(
   command: string,
@@ -440,6 +444,104 @@ export async function handleWriteCommand(
       const state = { url: page.url(), cookies, storage };
       fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
       return `Saved state to ${filePath} (${cookies.length} cookies, ${Object.keys(storage.localStorage).length} localStorage, ${Object.keys(storage.sessionStorage).length} sessionStorage)`;
+    }
+
+    case 'state-load': {
+      const filePath = args[0];
+      if (!filePath) throw new Error('Usage: browse state-load <file>');
+      if (path.normalize(filePath).includes('..')) {
+        throw new Error('Path traversal sequences (..) are not allowed');
+      }
+      if (!fs.existsSync(filePath)) throw new Error(`File not found: ${filePath}`);
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      let data: any;
+      try { data = JSON.parse(raw); } catch { throw new Error(`Invalid JSON in ${filePath}`); }
+
+      let cookieCount = 0;
+      let localStorageCount = 0;
+
+      // Load cookies
+      if (data.cookies && Array.isArray(data.cookies) && data.cookies.length > 0) {
+        await page.context().addCookies(data.cookies);
+        cookieCount = data.cookies.length;
+      }
+
+      // Load localStorage
+      if (data.storage?.localStorage && typeof data.storage.localStorage === 'object') {
+        const entries = Object.entries(data.storage.localStorage);
+        if (entries.length > 0) {
+          await page.evaluate((items: [string, unknown][]) => {
+            for (const [key, value] of items) {
+              localStorage.setItem(key, String(value));
+            }
+          }, entries);
+          localStorageCount = entries.length;
+        }
+      }
+
+      // Optionally navigate to saved URL
+      if (data.url && typeof data.url === 'string' && data.url !== 'about:blank') {
+        await page.goto(data.url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      }
+
+      return `Loaded state from ${filePath} (${cookieCount} cookies, ${localStorageCount} localStorage)`;
+    }
+
+    case 'session': {
+      const subCommand = args[0];
+      if (!subCommand) throw new Error('Usage: browse session <create|switch|list|destroy> [name]');
+
+      // Lazy-init session manager from the browser instance
+      if (!sessionManager) {
+        const browser = page.context().browser();
+        if (!browser) throw new Error('No browser instance available for session management');
+        sessionManager = new SessionManager(browser);
+      }
+
+      switch (subCommand) {
+        case 'create': {
+          const name = args[1];
+          if (!name) throw new Error('Usage: browse session create <name>');
+          await sessionManager.create(name);
+          return `Session '${name}' created`;
+        }
+        case 'switch': {
+          const name = args[1];
+          if (!name) throw new Error('Usage: browse session switch <name>');
+          sessionManager.get(name); // throws if not found
+          return `Switched to session '${name}' (context available)`;
+        }
+        case 'list': {
+          const sessions = sessionManager.list();
+          if (sessions.length === 0) return 'No sessions';
+          return `Sessions: ${sessions.join(', ')}`;
+        }
+        case 'destroy': {
+          const name = args[1];
+          if (!name) throw new Error('Usage: browse session destroy <name>');
+          await sessionManager.destroy(name);
+          return `Session '${name}' destroyed`;
+        }
+        default:
+          throw new Error(`Unknown session sub-command: ${subCommand}. Use create|switch|list|destroy`);
+      }
+    }
+
+    case 'frame': {
+      const selector = args[0];
+      if (!selector) throw new Error('Usage: browse frame <selector|main>');
+
+      if (selector === 'main') {
+        // Return to main frame (no-op in terms of page reference, but clears frame context)
+        return `Switched to main frame → ${page.url()}`;
+      }
+
+      // Find iframe by CSS selector
+      const frameElement = page.locator(selector);
+      const frame = await frameElement.contentFrame();
+      if (!frame) throw new Error(`No iframe found matching '${selector}'`);
+      const frameUrl = frame.url();
+      return `Switched to frame '${selector}' → ${frameUrl}`;
     }
 
     default:

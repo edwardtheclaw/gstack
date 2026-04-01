@@ -144,7 +144,7 @@ export const WRITE_COMMANDS = new Set([
   'click', 'fill', 'select', 'hover', 'type', 'press', 'scroll', 'wait',
   'viewport', 'cookie', 'cookie-import', 'cookie-import-browser', 'header', 'useragent',
   'upload', 'dialog-accept', 'dialog-dismiss',
-  'form-fill', 'state-save',
+  'form-fill', 'state-save', 'state-load', 'session', 'frame',
 ]);
 
 export const META_COMMANDS = new Set([
