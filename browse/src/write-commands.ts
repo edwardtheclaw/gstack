@@ -532,14 +532,14 @@ export async function handleWriteCommand(
       if (!selector) throw new Error('Usage: browse frame <selector|main>');
 
       if (selector === 'main') {
-        // Return to main frame (no-op in terms of page reference, but clears frame context)
         return `Switched to main frame → ${page.url()}`;
       }
 
-      // Find iframe by CSS selector
-      const frameElement = page.locator(selector);
-      const frame = await frameElement.contentFrame();
-      if (!frame) throw new Error(`No iframe found matching '${selector}'`);
+      // Find iframe element and get its content frame
+      const handle = await page.$(selector);
+      if (!handle) throw new Error(`No element found matching '${selector}'`);
+      const frame = await handle.contentFrame();
+      if (!frame) throw new Error(`Element '${selector}' is not an iframe`);
       const frameUrl = frame.url();
       return `Switched to frame '${selector}' → ${frameUrl}`;
     }
