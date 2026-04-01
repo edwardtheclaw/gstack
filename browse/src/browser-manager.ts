@@ -45,6 +45,37 @@ export class BrowserManager {
   private dialogAutoAccept: boolean = true;
   private dialogPromptText: string | null = null;
 
+  /** Connect to an already-running Chrome/Electron via CDP WebSocket endpoint */
+  async connectCDP(wsEndpoint: string) {
+    this.browser = await chromium.connectOverCDP(wsEndpoint);
+
+    // Reuse existing contexts and pages
+    const contexts = this.browser.contexts();
+    if (contexts.length > 0) {
+      this.context = contexts[0];
+      const pages = this.context.pages();
+      for (const page of pages) {
+        const id = this.nextTabId++;
+        this.pages.set(id, page);
+        this.setupPageHandlers(page);
+      }
+      if (pages.length > 0) {
+        this.activeTabId = 1; // first tab
+      }
+    } else {
+      // No existing context — create one
+      this.context = await this.browser.newContext({
+        viewport: { width: 1280, height: 720 },
+      });
+      await this.newTab();
+    }
+
+    this.browser.on('disconnected', () => {
+      console.error(`[${new Date().toISOString()}] [browse:ERROR] CDP connection lost`);
+      process.exit(1);
+    });
+  }
+
   async launch() {
     this.browser = await chromium.launch({ headless: true });
 

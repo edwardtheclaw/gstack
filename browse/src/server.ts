@@ -348,7 +348,14 @@ async function start() {
   const port = await findPort();
 
   // Launch browser
-  await browserManager.launch();
+  // CDP mode: connect to existing browser instead of launching
+  const cdpEndpoint = process.env.BROWSE_CDP_ENDPOINT;
+  if (cdpEndpoint) {
+    serverLog('INFO', `Connecting via CDP to ${cdpEndpoint}`);
+    await browserManager.connectCDP(cdpEndpoint);
+  } else {
+    await browserManager.launch();
+  }
 
   const startTime = Date.now();
   const server = Bun.serve({

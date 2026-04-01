@@ -267,6 +267,13 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
 async function main() {
   const args = process.argv.slice(2);
 
+  // Handle --cdp flag: set CDP endpoint for server
+  const cdpIdx = args.indexOf('--cdp');
+  if (cdpIdx !== -1 && cdpIdx + 1 < args.length) {
+    process.env.BROWSE_CDP_ENDPOINT = args[cdpIdx + 1];
+    args.splice(cdpIdx, 2);
+  }
+
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     console.log(`gstack browse — Fast headless browser for AI coding agents
 
@@ -294,6 +301,7 @@ Multi-step:     chain (reads JSON from stdin)
 Tabs:           tabs | tab <id> | newtab [url] | closetab [id]
 Server:         status | cookie <n>=<v> | header <n>:<v>
                 useragent <str> | stop | restart
+CDP:            --cdp ws://host:9222 (connect to running browser)
 Dialogs:        dialog-accept [text] | dialog-dismiss
 
 Refs:           After 'snapshot', use @e1, @e2... as selectors:
