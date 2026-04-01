@@ -156,10 +156,62 @@ export const META_COMMANDS = new Set([
   'url', 'snapshot',
 ]);
 
-// ─── WebSocket (T278 design — see websocket-types.ts) ──────────
-// Future: Add WebSocket endpoint at /ws for live streaming.
-// See browse/src/websocket-types.ts for message format spec.
-// Implementation: T279 (endpoint), T280 (screenshot/snapshot integration).
+// ─── WebSocket (see websocket-types.ts for message format) ─────
+import type { ServerMessage, ClientMessage } from './websocket-types';
+import type { ServerWebSocket } from 'bun';
+
+interface WSData {
+  authenticated: boolean;
+  createdAt: number;
+}
+
+const wsClients = new Set<ServerWebSocket<WSData>>();
+let wsScreenshotInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Broadcast a message to all connected WebSocket clients */
+function wsBroadcast(message: ServerMessage) {
+  const json = JSON.stringify(message);
+  for (const ws of wsClients) {
+    try { ws.send(json); } catch {}
+  }
+}
+
+/** Broadcast a screenshot to all connected clients */
+async function wsBroadcastScreenshot() {
+  if (wsClients.size === 0) return;
+  try {
+    const page = browserManager.getPage();
+    const buffer = await page.screenshot({ type: 'jpeg', quality: 60 });
+    const msg: ServerMessage = {
+      type: 'screenshot',
+      timestamp: Date.now(),
+      width: 1280,
+      height: 720,
+      format: 'jpeg',
+      data: buffer.toString('base64'),
+    };
+    wsBroadcast(msg);
+  } catch {}
+}
+
+/** Broadcast a DOM snapshot to all connected clients */
+async function wsBroadcastSnapshot() {
+  if (wsClients.size === 0) return;
+  try {
+    const page = browserManager.getPage();
+    const title = await page.title();
+    const text = await page.evaluate(() => document.body?.innerText?.slice(0, 5000) || '');
+    const msg: ServerMessage = {
+      type: 'snapshot',
+      timestamp: Date.now(),
+      url: page.url(),
+      title,
+      content: text,
+      format: 'text',
+    };
+    wsBroadcast(msg);
+  } catch {}
+}
 
 // ─── Server ────────────────────────────────────────────────────
 const browserManager = new BrowserManager();
@@ -305,6 +357,17 @@ async function start() {
     fetch: async (req) => {
       const url = new URL(req.url);
 
+      // WebSocket upgrade at /ws
+      if (url.pathname === '/ws') {
+        const token = url.searchParams.get('token');
+        if (token !== AUTH_TOKEN) {
+          return new Response('Unauthorized', { status: 401 });
+        }
+        const upgraded = server.upgrade(req, { data: { authenticated: true, createdAt: Date.now() } as WSData });
+        if (upgraded) return undefined as any;
+        return new Response('WebSocket upgrade failed', { status: 400 });
+      }
+
       // Cookie picker routes — no auth required (localhost-only)
       // Reset idle timer for interactive routes
       if (url.pathname.startsWith('/cookie-picker')) {
@@ -354,6 +417,84 @@ async function start() {
       }
 
       return new Response('Not found', { status: 404 });
+    },
+    websocket: {
+      open(ws: ServerWebSocket<WSData>) {
+        wsClients.add(ws);
+        const statusMsg: ServerMessage = {
+          type: 'status',
+          timestamp: Date.now(),
+          state: 'connected',
+          message: `Connected. ${wsClients.size} client(s) total.`,
+        };
+        ws.send(JSON.stringify(statusMsg));
+        serverLog('INFO', `WebSocket client connected (${wsClients.size} total)`);
+
+        // Start periodic screenshots if first client
+        if (wsClients.size === 1 && !wsScreenshotInterval) {
+          wsScreenshotInterval = setInterval(async () => {
+            await wsBroadcastScreenshot();
+            await wsBroadcastSnapshot();
+          }, 2000);
+        }
+      },
+      close(ws: ServerWebSocket<WSData>) {
+        wsClients.delete(ws);
+        serverLog('INFO', `WebSocket client disconnected (${wsClients.size} remaining)`);
+
+        // Stop periodic screenshots if no clients
+        if (wsClients.size === 0 && wsScreenshotInterval) {
+          clearInterval(wsScreenshotInterval);
+          wsScreenshotInterval = null;
+        }
+      },
+      async message(ws: ServerWebSocket<WSData>, raw: string | Buffer) {
+        try {
+          const msg: ClientMessage = JSON.parse(typeof raw === 'string' ? raw : raw.toString());
+
+          switch (msg.type) {
+            case 'command': {
+              const result = await handleCommand({ command: msg.command, args: msg.args });
+              const text = await result.text();
+              ws.send(JSON.stringify({
+                type: 'command_response',
+                id: msg.id,
+                success: result.status === 200,
+                result: result.status === 200 ? text : undefined,
+                error: result.status !== 200 ? text : undefined,
+              }));
+              break;
+            }
+            case 'screenshot_request':
+              await wsBroadcastScreenshot();
+              break;
+            case 'snapshot_request':
+              await wsBroadcastSnapshot();
+              break;
+            case 'stream_config':
+              // Adjust streaming interval
+              if (msg.screenshotInterval !== undefined) {
+                if (wsScreenshotInterval) clearInterval(wsScreenshotInterval);
+                if (msg.screenshotInterval > 0) {
+                  wsScreenshotInterval = setInterval(async () => {
+                    await wsBroadcastScreenshot();
+                    await wsBroadcastSnapshot();
+                  }, msg.screenshotInterval);
+                } else {
+                  wsScreenshotInterval = null;
+                }
+              }
+              break;
+          }
+        } catch (err: any) {
+          ws.send(JSON.stringify({
+            type: 'status',
+            timestamp: Date.now(),
+            state: 'error',
+            message: err.message,
+          }));
+        }
+      },
     },
   });
 
