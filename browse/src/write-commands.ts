@@ -426,6 +426,22 @@ export async function handleWriteCommand(
       return lines.join('\n');
     }
 
+    case 'state-save': {
+      const filePath = args[0];
+      if (!filePath) throw new Error('Usage: browse state-save <file>');
+      if (path.normalize(filePath).includes('..')) {
+        throw new Error('Path traversal sequences (..) are not allowed');
+      }
+      const cookies = await page.context().cookies();
+      const storage = await page.evaluate(() => ({
+        localStorage: { ...localStorage },
+        sessionStorage: { ...sessionStorage },
+      }));
+      const state = { url: page.url(), cookies, storage };
+      fs.writeFileSync(filePath, JSON.stringify(state, null, 2), 'utf-8');
+      return `Saved state to ${filePath} (${cookies.length} cookies, ${Object.keys(storage.localStorage).length} localStorage, ${Object.keys(storage.sessionStorage).length} sessionStorage)`;
+    }
+
     default:
       throw new Error(`Unknown write command: ${command}`);
   }
