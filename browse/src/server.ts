@@ -145,7 +145,7 @@ export const WRITE_COMMANDS = new Set([
   'viewport', 'cookie', 'cookie-import', 'cookie-import-browser', 'header', 'useragent',
   'upload', 'dialog-accept', 'dialog-dismiss',
   'form-fill', 'state-save', 'state-load', 'session', 'frame',
-  'vault', 'login', 'device',
+  'vault', 'login', 'device', 'intercept', 'unintercept',
 ]);
 
 export const META_COMMANDS = new Set([
@@ -155,6 +155,11 @@ export const META_COMMANDS = new Set([
   'chain', 'diff',
   'url', 'snapshot',
 ]);
+
+// ─── WebSocket (T278 design — see websocket-types.ts) ──────────
+// Future: Add WebSocket endpoint at /ws for live streaming.
+// See browse/src/websocket-types.ts for message format spec.
+// Implementation: T279 (endpoint), T280 (screenshot/snapshot integration).
 
 // ─── Server ────────────────────────────────────────────────────
 const browserManager = new BrowserManager();

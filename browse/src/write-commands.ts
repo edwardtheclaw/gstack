@@ -644,6 +644,47 @@ export async function handleWriteCommand(
       return `Login '${name}': filled ${filled.join(' + ')}`;
     }
 
+    case 'intercept': {
+      // Route interception: intercept <url-pattern> <action> [body/status]
+      // Actions: block, mock <json>, status <code>
+      const pattern = args[0];
+      const action = args[1];
+      if (!pattern || !action) throw new Error('Usage: browse intercept <url-pattern> <block|mock|status> [data]');
+
+      await page.route(pattern, async (route) => {
+        switch (action) {
+          case 'block':
+            await route.abort();
+            break;
+          case 'mock': {
+            const body = args.slice(2).join(' ') || '{}';
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body,
+            });
+            break;
+          }
+          case 'status': {
+            const statusCode = parseInt(args[2] || '404', 10);
+            await route.fulfill({ status: statusCode, body: '' });
+            break;
+          }
+          default:
+            await route.continue();
+        }
+      });
+
+      return `Intercepting ${pattern} → ${action}`;
+    }
+
+    case 'unintercept': {
+      const pattern = args[0];
+      if (!pattern) throw new Error('Usage: browse unintercept <url-pattern>');
+      await page.unroute(pattern);
+      return `Removed intercept for ${pattern}`;
+    }
+
     case 'device': {
       const name = args.join(' ');
       if (!name) {
